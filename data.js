@@ -5,23 +5,23 @@ const MODULE_DEFS = {
     params: [
       { id: 'stock',    label: 'Stock',    type: 'select', options: ['trix','hp5','kodachrome','portra','ektachrome'], labels: ['TRI-X 400','HP5 PLUS','KODACHROME 64','PORTRA 400','EKTACHROME 100'], default: 'kodachrome' },
       { id: 'exposure', label: 'Exposure', type: 'slider', min: -2, max: 2, step: 0.1, default: 0, unit: 'EV' },
-      { id: 'halation', label: 'Halation', type: 'slider', min: 0, max: 1, step: 0.05, default: 0.5 },
-      { id: 'fade',     label: 'Fade',     type: 'slider', min: 0, max: 1, step: 0.05, default: 0 },
+      { id: 'halation', label: 'Halation', type: 'filmstock-chip', kind: 'halation', min: 0, max: 1, step: 0.05, default: 0.5 },
+      { id: 'fade',     label: 'Fade',     type: 'filmstock-chip', kind: 'fade',     min: 0, max: 1, step: 0.05, default: 0 },
     ]
   },
   velox: {
     id: 'velox', group: 'PRE-SCREEN', label: 'VELOX', removable: true,
     desc: 'High-contrast photographic paper used to make screened prints for paste-up. Sigmoid crush pushes tones toward black or white.',
     params: [
-      { id: 'threshold', label: 'Threshold', type: 'slider', min: 0.1, max: 0.9, step: 0.01, default: 0.5 },
-      { id: 'contrast',  label: 'Contrast',  type: 'slider', min: 1.0, max: 3.0, step: 0.1,  default: 1.5 },
+      { id: 'threshold', label: 'Threshold', type: 'velox-chip', min: 0.1, max: 0.9, step: 0.01, default: 0.5 },
+      { id: 'contrast',  label: 'Contrast',  type: 'velox-chip', min: 1.0, max: 3.0, step: 0.1,  default: 1.5 },
     ]
   },
   grain: {
     id: 'grain', group: 'PRE-SCREEN', label: 'FILM GRAIN', removable: true,
     desc: 'Silver halide clumping from the original film negative. Shadow weighting concentrates grain in dark areas.',
     params: [
-      { id: 'amount',   label: 'Amount',       type: 'slider', min: 0, max: 0.5, step: 0.01, default: 0.12 },
+      { id: 'amount',   label: 'Amount',       type: 'grain-chip', min: 0, max: 0.5, step: 0.01, default: 0.12 },
       { id: 'weighted', label: 'Shadow Weight', type: 'toggle', options: ['off','on'], default: 'on' },
     ]
   },
@@ -56,18 +56,18 @@ const MODULE_DEFS = {
     id: 'dotgain', group: 'PRINT', label: 'DOT GAIN', removable: true,
     desc: 'Mechanical dot enlargement during impression. Midtones inflate non-linearly; shadow fill crushes deep blacks to solid.',
     params: [
-      { id: 'amount', label: 'Gain',        type: 'slider', min: 0, max: 1.0, step: 0.01,  default: 0.25 },
-      { id: 'shadow', label: 'Shadow Fill', type: 'slider', min: 0, max: 1,   step: 0.05, default: 0.3 },
+      { id: 'amount', label: 'Gain',        type: 'dotgain-chip', kind: 'amount', min: 0, max: 1.0, step: 0.01, default: 0.25 },
+      { id: 'shadow', label: 'Shadow Fill', type: 'dotgain-chip', kind: 'shadow', min: 0, max: 1,   step: 0.05, default: 0.3  },
     ]
   },
   registration: {
     id: 'registration', group: 'PRINT', label: 'REGISTRATION', removable: true,
     desc: 'Channel misalignment and lateral web stretch. Pads shift plates globally. Fan-Out expands later plates orthogonally.',
     params: [
-      { id: 'c_xy',   label: 'CYAN',           type: 'xypad',  xId: 'cx', yId: 'cy', min: -15, max: 15, step: 0.5, color: '#00a0d8' },
-      { id: 'm_xy',   label: 'MAGENTA',         type: 'xypad',  xId: 'mx', yId: 'my', min: -15, max: 15, step: 0.5, color: '#d8006a' },
-      { id: 'y_xy',   label: 'YELLOW',          type: 'xypad',  xId: 'yx', yId: 'yy', min: -15, max: 15, step: 0.5, color: '#d8c800' },
-      { id: 'fanout', label: 'Fan-Out Stretch', type: 'slider', min: 0,   max: 10,  step: 0.1, default: 0, unit: 'px' },
+      { id: 'c_xy',   label: 'CYAN',    type: 'registration-chip', xId: 'cx', yId: 'cy', min: -15, max: 15, step: 0.5, color: '#00a0d8' },
+      { id: 'm_xy',   label: 'MAGENTA', type: 'registration-chip', xId: 'mx', yId: 'my', min: -15, max: 15, step: 0.5, color: '#d8006a' },
+      { id: 'y_xy',   label: 'YELLOW',  type: 'registration-chip', xId: 'yx', yId: 'yy', min: -15, max: 15, step: 0.5, color: '#d8c800' },
+      { id: 'fanout', label: 'Fan-Out', type: 'slider', min: 0, max: 10, step: 0.1, default: 0, unit: 'px' },
     ],
     extraDefaults: { cx: 0, cy: 0, mx: 0, my: 0, yx: 0, yy: 0, fanout: 0 },
   },
@@ -91,17 +91,17 @@ const MODULE_DEFS = {
     id: 'inkbleed', group: 'PRINT', label: 'INK BLEED', removable: true,
     desc: 'Ink wicking along paper fibers. Anisotropic settings cause ink to travel further along the structural grain.',
     params: [
-      { id: 'radius',        label: 'Radius',        type: 'slider', min: 1, max: 16, step: 1,    default: 3,   unit: 'px', width: 'narrow' },
-      { id: 'absorbency',    label: 'Absorbency',    type: 'slider', min: 0, max: 1,  step: 0.05, default: 0.8 },
-      { id: 'directionality',label: 'Directionality',type: 'slider', min: 0, max: 1,  step: 0.05, default: 0.7 },
+      { id: 'radius',         label: 'Radius',         type: 'inkbleed-chip', kind: 'radius',         min: 1, max: 16, step: 1,    default: 3   },
+      { id: 'absorbency',     label: 'Absorbency',     type: 'inkbleed-chip', kind: 'absorbency',     min: 0, max: 1,  step: 0.05, default: 0.8 },
+      { id: 'directionality', label: 'Directionality', type: 'inkbleed-chip', kind: 'directionality', min: 0, max: 1,  step: 0.05, default: 0.7 },
     ]
   },
   hickeys: {
     id: 'hickeys', group: 'PRINT', label: 'HICKEYS', removable: true,
     desc: 'Donut-shaped defects applied to individual plates, allowing other channels to print in the void.',
     params: [
-      { id: 'count',   label: 'Count', type: 'slider', min: 1, max: 100, step: 1,  default: 12, width: 'narrow' },
-      { id: 'sizeMax', label: 'Size',  type: 'slider', min: 3, max: 30,  step: 1,  default: 8,  unit: 'px', width: 'narrow' },
+      { id: 'count',   label: 'Count', type: 'hickeys-chip', kind: 'count', min: 1, max: 100, step: 1, default: 12 },
+      { id: 'sizeMax', label: 'Size',  type: 'hickeys-chip', kind: 'size',  min: 3, max: 30,  step: 1, default: 8  },
     ]
   },
 };

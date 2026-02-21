@@ -1383,6 +1383,439 @@ function buildPaperToothChip(p, params, item) {
 }
 
 
+
+
+// ─── Shared chip factory ─────────────────────────────────────────
+// Builds the standard press-chip shell (preview canvas + slider + label)
+// and calls drawFn(ctx, CW, CH, params) whenever the slider changes.
+function _makeStandardChip(p, params, item, CW, CH, drawFn) {
+  item.className = 'ctrl-custom-wrap';
+  item.innerHTML = '';
+
+  const chip = document.createElement('div');
+  chip.className = 'press-chip';
+  chip.style.gap = '8px';
+  item.appendChild(chip);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'press-svg-wrap';
+  wrap.style.cssText = `width:${CW}px; height:${CH}px;`;
+  const canvas = document.createElement('canvas');
+  canvas.width = CW; canvas.height = CH;
+  wrap.appendChild(canvas);
+  chip.appendChild(wrap);
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'press-hslider';
+  slider.style.width = CW + 'px';
+  slider.min = p.min; slider.max = p.max; slider.step = p.step;
+  slider.value = params[p.id];
+  slider.title = 'Double-click to reset';
+  chip.appendChild(slider);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'press-seq-label';
+  lbl.textContent = p.label;
+  chip.appendChild(lbl);
+
+  const ctx = canvas.getContext('2d');
+  const redraw = () => drawFn(ctx, CW, CH, params);
+  redraw();
+
+  slider.addEventListener('input', () => {
+    params[p.id] = parseFloat(slider.value); redraw(); scheduleRender();
+  });
+  slider.addEventListener('dblclick', () => {
+    params[p.id] = p.default; slider.value = p.default; redraw(); scheduleRender();
+  });
+
+  return { canvas, slider, redraw };
+}
+
+// ─── LCG seeded noise helper (reusable) ─────────────────────────
+function _makeLCG(seed) {
+  let s = seed >>> 0;
+  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 0xffffffff; };
+}
+
+// ─── Film stock chips ────────────────────────────────────────────
+function buildFilmstockChip(p, params, item) {
+  const CW = 130, CH = 110;
+
+  // Pre-build stable noise once
+  const noise = new Float32Array(CW * CH);
+  const rng = _makeLCG(p.kind === 'halation' ? 0xbeef : 0xcafe);
+  for (let i = 0; i < noise.length; i++) noise[i] = rng();
+
+  _makeStandardChip(p, params, item, CW, CH, (ctx) => {
+    const val = params[p.id];
+
+    if (p.kind === 'halation') {
+      // Dark scene with bright highlights bleeding outward
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(0, 0, CW, CH);
+      // Simulate a few bright point sources
+      const srcs = [[40,35],[90,28],[65,75]];
+      srcs.forEach(([sx,sy]) => {
+        const maxR = 8 + val * 38;
+        // Core bright spot
+        const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, maxR);
+        g.addColorStop(0,   `rgba(255,220,160,1)`);
+        g.addColorStop(0.15,`rgba(255,180,80,${0.6 + val * 0.3})`);
+        g.addColorStop(0.5, `rgba(220,80,40,${val * 0.5})`);
+        g.addColorStop(1,   `rgba(180,40,10,0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(sx, sy, maxR, 0, Math.PI*2); ctx.fill();
+      });
+      // Grain on top
+      const imgd = ctx.getImageData(0, 0, CW, CH);
+      for (let i = 0; i < CW * CH; i++) {
+        const g = (noise[i] - 0.5) * 25;
+        imgd.data[i*4]   = Math.max(0, Math.min(255, imgd.data[i*4]   + g));
+        imgd.data[i*4+1] = Math.max(0, Math.min(255, imgd.data[i*4+1] + g));
+        imgd.data[i*4+2] = Math.max(0, Math.min(255, imgd.data[i*4+2] + g));
+      }
+      ctx.putImageData(imgd, 0, 0);
+
+    } else {
+      // Fade: left=fresh saturated, right=faded/yellowed
+      const fresh  = [20, 20, 20];
+      const faded  = [210, 190, 140];
+      const imgd   = ctx.createImageData(CW, CH);
+      const rng2   = _makeLCG(0xdead);
+      for (let y = 0; y < CH; y++) {
+        for (let x = 0; x < CW; x++) {
+          const t   = x / (CW - 1);               // 0=left fresh, 1=right faded
+          const mix = t * val;
+          const n   = (rng2() - 0.5) * 15;
+          const i   = (y * CW + x) * 4;
+          imgd.data[i]   = Math.max(0,Math.min(255, fresh[0] + (faded[0]-fresh[0])*mix + n));
+          imgd.data[i+1] = Math.max(0,Math.min(255, fresh[1] + (faded[1]-fresh[1])*mix + n));
+          imgd.data[i+2] = Math.max(0,Math.min(255, fresh[2] + (faded[2]-fresh[2])*mix + n));
+          imgd.data[i+3] = 255;
+        }
+      }
+      ctx.putImageData(imgd, 0, 0);
+      // Label gradient direction
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(0, CH-16, CW, 16);
+      ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.textAlign = 'left';
+      ctx.fillText('FRESH', 4, CH-4);
+      ctx.fillStyle = '#c8b870'; ctx.textAlign = 'right';
+      ctx.fillText('FADED', CW-4, CH-4);
+    }
+  });
+}
+
+// ─── Velox chips ─────────────────────────────────────────────────
+function buildVeloxChip(p, params, item) {
+  const CW = 130, CH = 110;
+  _makeStandardChip(p, params, item, CW, CH, (ctx) => {
+    const threshold = params.threshold ?? 0.5;
+    const contrast  = params.contrast  ?? 1.5;
+
+    // Draw a sigmoid tone curve on dark background
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Grid lines
+    ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1;
+    [0.25, 0.5, 0.75].forEach(t => {
+      const x = t * CW, y = (1 - t) * CH;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CH); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CW, y); ctx.stroke();
+    });
+
+    // Diagonal identity
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, CH); ctx.lineTo(CW, 0); ctx.stroke();
+
+    // Sigmoid curve
+    ctx.strokeStyle = '#e8d870'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x <= CW; x++) {
+      const t   = x / CW;
+      const sig = 1 / (1 + Math.exp(-contrast * 10 * (t - threshold)));
+      const y   = (1 - sig) * CH;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Threshold marker
+    ctx.strokeStyle = '#e87040'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    const tx = threshold * CW;
+    ctx.beginPath(); ctx.moveTo(tx, 0); ctx.lineTo(tx, CH); ctx.stroke();
+    ctx.setLineDash([]);
+  });
+}
+
+// ─── Film grain chip ─────────────────────────────────────────────
+function buildGrainChip(p, params, item) {
+  const CW = 130, CH = 110;
+
+  const noise = new Float32Array(CW * CH);
+  const rng = _makeLCG(0x1701d);
+  for (let i = 0; i < noise.length; i++) noise[i] = rng();
+
+  _makeStandardChip(p, params, item, CW, CH, (ctx) => {
+    const amount = params.amount ?? 0.12;
+    const weighted = params.weighted === 'on';
+    const imgd = ctx.createImageData(CW, CH);
+
+    // Left half bright, right half dark — shows shadow weighting effect
+    for (let y = 0; y < CH; y++) {
+      for (let x = 0; x < CW; x++) {
+        const i   = y * CW + x;
+        const base = x < CW / 2 ? 200 : 40;          // bright | dark
+        const normalised = base / 255;
+        const shadowW = weighted ? (1 - normalised) : 1;
+        const g   = (noise[i] - 0.5) * amount * 600 * shadowW;
+        const v   = Math.max(0, Math.min(255, base + g));
+        imgd.data[i*4]   = v;
+        imgd.data[i*4+1] = v;
+        imgd.data[i*4+2] = v;
+        imgd.data[i*4+3] = 255;
+      }
+    }
+    ctx.putImageData(imgd, 0, 0);
+
+    // Divider + labels
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(CW/2, 0); ctx.lineTo(CW/2, CH); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, CH-16, CW/2, 16);
+    ctx.fillRect(CW/2, CH-16, CW/2, 16);
+    ctx.font = '9px monospace'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#aaa'; ctx.fillText('HIGHS', CW/4, CH-4);
+    ctx.fillStyle = '#666'; ctx.fillText('SHADOWS', CW*3/4, CH-4);
+  });
+}
+
+// ─── Dot gain chips ──────────────────────────────────────────────
+function buildDotGainChip(p, params, item) {
+  const CW = 130, CH = 110;
+  _makeStandardChip(p, params, item, CW, CH, (ctx) => {
+    const amount = params.amount ?? 0.25;
+    const shadow = params.shadow ?? 0.3;
+    const paper  = '#e8e0d0';
+    const ink    = '#1a1612';
+
+    ctx.fillStyle = paper;
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Draw 3 rows: highlights, midtones, shadows — showing dot inflation
+    const rows = [
+      { tone: 0.25, y: 12,  label: 'HI' },
+      { tone: 0.55, y: 46,  label: 'MID' },
+      { tone: 0.85, y: 80,  label: 'SHD' },
+    ];
+    const cellSize = 18;
+
+    rows.forEach(({ tone, y }) => {
+      // Gain inflates midtones non-linearly (peaks at 0.5)
+      const gainPeak = 4 * tone * (1 - tone);
+      let radius;
+      if (p.kind === 'shadow' && tone > 0.7) {
+        // Shadow fill crushes dark dots to solid
+        radius = tone > (1 - shadow) ? cellSize * 0.5 * 0.98 : cellSize * 0.5 * Math.sqrt(tone);
+      } else {
+        radius = cellSize * 0.5 * Math.sqrt(Math.min(1, tone + amount * gainPeak * 0.6));
+      }
+      ctx.fillStyle = ink;
+      for (let x = cellSize/2; x < CW - 4; x += cellSize) {
+        ctx.beginPath(); ctx.arc(x, y + cellSize/2, radius, 0, Math.PI*2); ctx.fill();
+      }
+    });
+
+    // Row labels
+    ctx.font = '9px monospace'; ctx.textAlign = 'right'; ctx.fillStyle = '#888';
+    rows.forEach(({ y, label }) => ctx.fillText(label, CW-4, y + cellSize/2 + 4));
+  });
+}
+
+// ─── Registration chips ──────────────────────────────────────────
+function buildRegistrationChip(p, params, item) {
+  item.className = 'ctrl-custom-wrap';
+  item.innerHTML = '';
+
+  const chip = document.createElement('div');
+  chip.className = 'press-chip';
+  chip.style.gap = '8px';
+  item.appendChild(chip);
+
+  const CW = 130, CH = 110;
+  const wrap = document.createElement('div');
+  wrap.className = 'press-svg-wrap';
+  wrap.style.cssText = `width:${CW}px; height:${CH}px; cursor:crosshair;`;
+  const canvas = document.createElement('canvas');
+  canvas.width = CW; canvas.height = CH;
+  wrap.appendChild(canvas);
+  chip.appendChild(wrap);
+
+  // Two sliders: X and Y
+  const sliderRow = document.createElement('div');
+  sliderRow.style.cssText = 'display:flex; flex-direction:column; gap:4px; align-items:center;';
+
+  const makeSlider = (id, label) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:center; gap:6px;';
+    const lbl = document.createElement('span');
+    lbl.className = 'press-seq-label';
+    lbl.style.cssText = 'min-width:12px; font-size:10px;';
+    lbl.textContent = label;
+    const s = document.createElement('input');
+    s.type = 'range'; s.className = 'press-hslider';
+    s.style.width = (CW - 28) + 'px';
+    s.min = p.min; s.max = p.max; s.step = p.step;
+    s.value = params[id] ?? 0;
+    s.title = 'Double-click to reset';
+    row.appendChild(lbl); row.appendChild(s);
+    sliderRow.appendChild(row);
+    return s;
+  };
+
+  const sx = makeSlider(p.xId, 'X');
+  const sy = makeSlider(p.yId, 'Y');
+  chip.appendChild(sliderRow);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'press-seq-label';
+  lbl.style.cssText = `color:${p.color};`;
+  lbl.textContent = p.label;
+  chip.appendChild(lbl);
+
+  const ctx = canvas.getContext('2d');
+
+  function draw() {
+    const ox = params[p.xId] ?? 0;
+    const oy = params[p.yId] ?? 0;
+    const cx = CW / 2, cy = CH / 2;
+    const r  = 14;
+
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Crosshair
+    ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, CH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(CW, cy); ctx.stroke();
+
+    // Key (black) dot at centre
+    ctx.fillStyle = '#1a1612';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+
+    // Colour channel dot offset
+    const scale = 3;   // pixels per unit, keeps it visible but not crazy
+    const dx = ox * scale, dy = oy * scale;
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(cx + dx, cy + dy, r, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Offset readout
+    ctx.fillStyle = '#555'; ctx.font = '9px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(`${ox >= 0 ? '+' : ''}${ox.toFixed(1)}, ${oy >= 0 ? '+' : ''}${oy.toFixed(1)}`, cx, CH - 4);
+  }
+
+  draw();
+
+  const update = (id, slider) => {
+    params[id] = parseFloat(slider.value); draw(); scheduleRender();
+  };
+  sx.addEventListener('input', () => update(p.xId, sx));
+  sy.addEventListener('input', () => update(p.yId, sy));
+  sx.addEventListener('dblclick', () => { params[p.xId] = 0; sx.value = 0; draw(); scheduleRender(); });
+  sy.addEventListener('dblclick', () => { params[p.yId] = 0; sy.value = 0; draw(); scheduleRender(); });
+}
+
+// ─── Ink bleed chips ─────────────────────────────────────────────
+function buildInkBleedChip(p, params, item) {
+  const CW = 130, CH = 110;
+  _makeStandardChip(p, params, item, CW, CH, (ctx) => {
+    const radius        = params.radius        ?? 3;
+    const absorbency    = params.absorbency    ?? 0.8;
+    const directionality = params.directionality ?? 0.7;
+
+    ctx.fillStyle = '#e8e0d0';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Draw a 3×3 grid of dots with bleed halos
+    const cell = 32, dotR = 6;
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        const cx = 22 + col * cell;
+        const cy = 18 + row * cell;
+
+        // Bleed halo — ellipse when directional
+        const haloRx = radius * (1 + directionality * 1.5) * absorbency * 1.5;
+        const haloRy = radius * (1 - directionality * 0.5) * absorbency * 1.5;
+
+        if (haloRx > 0.5) {
+          const g = ctx.createRadialGradient(cx, cy, dotR * 0.8, cx, cy, dotR + haloRx);
+          g.addColorStop(0,   `rgba(26,22,18,${absorbency * 0.5})`);
+          g.addColorStop(1,   `rgba(26,22,18,0)`);
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.scale(1, haloRy / haloRx);
+          ctx.translate(-cx, -cy);
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(cx, cy, dotR + haloRx, 0, Math.PI*2); ctx.fill();
+          ctx.restore();
+        }
+
+        // Solid dot on top
+        ctx.fillStyle = '#1a1612';
+        ctx.beginPath(); ctx.arc(cx, cy, dotR, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  });
+}
+
+// ─── Hickeys chips ───────────────────────────────────────────────
+function buildHickeysChip(p, params, item) {
+  const CW = 130, CH = 110;
+  const noise = (() => {
+    const buf = []; const rng = _makeLCG(0xf00d);
+    for (let i = 0; i < 200; i++) buf.push(rng());
+    return buf;
+  })();
+
+  _makeStandardChip(p, params, item, CW, CH, (ctx) => {
+    const count  = Math.round(params.count  ?? 12);
+    const sizeMax = params.sizeMax ?? 8;
+
+    ctx.fillStyle = '#e8e0d0';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Dot field background
+    ctx.fillStyle = '#1a1612';
+    const cell = 10;
+    for (let y = cell/2; y < CH; y += cell) {
+      for (let x = cell/2; x < CW; x += cell) {
+        ctx.beginPath(); ctx.arc(x, y, cell * 0.32, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    // Hickeys: donut-shaped voids punched through the dot field
+    const shown = Math.min(count, 40); // cap display at 40
+    for (let i = 0; i < shown; i++) {
+      const cx = noise[i * 3 % 198]     * CW;
+      const cy = noise[(i * 3 + 1) % 198] * CH;
+      const r  = (0.4 + noise[(i * 3 + 2) % 198] * 0.6) * sizeMax;
+
+      // Clear a donut: paper colour ring, then tiny ink centre
+      ctx.fillStyle = '#e8e0d0';
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+
+      // Thin ink ring around the void edge (the hickey outline)
+      ctx.strokeStyle = '#1a1612'; ctx.lineWidth = Math.max(0.5, r * 0.15);
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.7, 0, Math.PI*2); ctx.stroke();
+    }
+  });
+}
+
+
 const CONTROL_BUILDERS = {
   'slider':             buildSliderControl,
   'select':             buildSelectControl,
@@ -1401,6 +1834,13 @@ const CONTROL_BUILDERS = {
   'angle-chip':         buildAngleChip,
   'inkskip-chip':       buildInkSkipChip,
   'paper-tooth-chip':   buildPaperToothChip,
+  'filmstock-chip':     buildFilmstockChip,
+  'velox-chip':         buildVeloxChip,
+  'grain-chip':         buildGrainChip,
+  'dotgain-chip':       buildDotGainChip,
+  'registration-chip':  buildRegistrationChip,
+  'inkbleed-chip':      buildInkBleedChip,
+  'hickeys-chip':       buildHickeysChip,
 };
 
 function buildControls(container, moduleId) {
