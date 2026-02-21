@@ -20,7 +20,7 @@
   --blk-ink: #1a1612;
   --chip-h: 56px;
   --strip-h: 76px;
-  --panel-h: 280px;
+  --panel-h: 310px;
   --header-h: 50px;
 }
 
@@ -433,7 +433,7 @@ body {
 }
 .press-chip-row { display: flex; flex-direction: row; gap: 12px; align-items: center; }
 .press-svg-wrap {
-  height: 142px; flex-shrink: 0;
+  flex-shrink: 0;
   background: var(--surf); border-radius: 6px; border: 1px solid var(--border2); overflow: hidden;
 }
 .press-vslider-wrap { display: flex; align-items: center; justify-content: center; height: 142px; width: 20px; flex-shrink: 0; }

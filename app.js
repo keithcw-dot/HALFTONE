@@ -435,7 +435,11 @@ function buildColorControl(p, params, item, moduleId) {
   input.type = 'color'; input.value = params[p.id];
   input.addEventListener('input', () => {
     params[p.id] = input.value; swatch.style.background = input.value;
-    if (moduleId === 'halftone') buildPipelineStrip();
+    if (moduleId === 'halftone') {
+      buildPipelineStrip();
+      // Duotone color changes affect the angle chip previews
+      Object.values(_angleDrawers).forEach(fn => fn());
+    }
     scheduleRender();
   });
   swatch.appendChild(input); item.appendChild(swatch);
@@ -751,6 +755,115 @@ function buildSlurChip(p, params, item) {
   slSlider.addEventListener('input', (e) => { const val = parseFloat(e.target.value); params[p.id] = val; renderSlDots(val); scheduleRender(); });
 }
 
+// ─── Angle chip for halftone screen angles ───────────────────────
+// Registry of draw functions keyed by param id. Cleared each time
+// buildControls runs so stale closures don't accumulate across panel opens.
+let _angleDrawers = {};
+
+function _drawDots(ctx, w, h, angleDeg, inkHex, cellPx) {
+  const rad  = angleDeg * Math.PI / 180;
+  const cosA = Math.cos(rad), sinA = Math.sin(rad);
+  const diag = Math.ceil(Math.sqrt(w * w + h * h) / 2) + cellPx * 2;
+  const cx = w / 2, cy = h / 2;
+  const r  = cellPx * 0.36;
+  ctx.fillStyle = inkHex;
+  for (let gy = -diag; gy < diag; gy += cellPx) {
+    for (let gx = -diag; gx < diag; gx += cellPx) {
+      const x = cx + gx * cosA - gy * sinA;
+      const y = cy + gx * sinA + gy * cosA;
+      if (x < -cellPx || x > w + cellPx || y < -cellPx || y > h + cellPx) continue;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
+function _angleInkColor(id, params, mode) {
+  if (mode === 'duotone') {
+    if (id === 'angleK') return params.duotoneColor1 || '#1a1008';
+    if (id === 'angleC') return params.duotoneColor2 || '#d4890a';
+  }
+  return { angleK: '#1a1612', angleC: '#009fce', angleM: '#d4006a', angleY: '#f5d800' }[id] || '#444';
+}
+
+function buildAngleChip(p, params, item, moduleId) {
+  item.className = 'ctrl-custom-wrap';
+  item.innerHTML = '';
+
+  const mode   = params.mode;
+  const CELL   = 11;
+  const CW = 120, CH = 110;
+
+  const chip = document.createElement('div');
+  chip.className = 'press-chip';
+  chip.style.gap = '8px';
+
+  // Canvas preview area
+  const wrap = document.createElement('div');
+  wrap.className = 'press-svg-wrap';
+  wrap.style.cssText = `width:${CW}px; height:${CH}px; flex-shrink:0;`;
+  const canvas = document.createElement('canvas');
+  canvas.width = CW; canvas.height = CH;
+  wrap.appendChild(canvas);
+  chip.appendChild(wrap);
+
+  // Angle slider
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'press-hslider';
+  slider.style.width = CW + 'px';
+  slider.min = p.min; slider.max = p.max; slider.step = p.step;
+  slider.value = params[p.id];
+  chip.appendChild(slider);
+
+  // Label at bottom of chip
+  const lbl = document.createElement('div');
+  lbl.className = 'press-seq-label';
+  lbl.textContent = p.label;
+  chip.appendChild(lbl);
+
+  item.appendChild(chip);
+
+  function draw() {
+    const ctx = canvas.getContext('2d');
+    const paper = params.paperColor || '#f0ead8';
+    ctx.fillStyle = paper;
+    ctx.fillRect(0, 0, CW, CH);
+
+    const master = params.masterAngle || 0;
+
+    if (p.master) {
+      // Overlay all active channels at their actual angles
+      const savedGCO = ctx.globalCompositeOperation;
+      ctx.globalCompositeOperation = 'multiply';
+      const allIds = ['angleK','angleC','angleM','angleY'];
+      const visible = mode === 'bw' ? ['angleK'] : mode === 'duotone' ? ['angleK','angleC'] : allIds;
+      for (const id of visible) {
+        _drawDots(ctx, CW, CH, (params[id] || 0) + master, _angleInkColor(id, params, mode), CELL);
+      }
+      ctx.globalCompositeOperation = savedGCO;
+    } else {
+      // Individual plate: show actual angle (own + master offset)
+      _drawDots(ctx, CW, CH, params[p.id] + master, _angleInkColor(p.id, params, mode), CELL);
+    }
+  }
+
+  _angleDrawers[p.id] = draw;
+  draw();
+
+  slider.addEventListener('input', (e) => {
+    params[p.id] = parseFloat(e.target.value);
+    draw();
+    if (p.master) {
+      // Master moved → all plate chips need to show new actual angles
+      Object.entries(_angleDrawers).forEach(([id, fn]) => { if (id !== 'masterAngle') fn(); });
+    } else {
+      // Plate moved → master overlay needs to update
+      if (_angleDrawers['masterAngle']) _angleDrawers['masterAngle']();
+    }
+    scheduleRender();
+  });
+}
+
 // ─── Dispatch table ──────────────────────────────────────────────
 // Maps param type → builder function. Standard controls get a label
 // prepended automatically; chip builders call buildChipLabel() themselves
@@ -766,12 +879,16 @@ const CONTROL_BUILDERS = {
   'feed-chip':        buildFeedChip,
   'laydown-chip':     buildLaydownChip,
   'slur-chip':        buildSlurChip,
+  'angle-chip':       buildAngleChip,
 };
 
 function buildControls(container, moduleId) {
   const def    = MODULE_DEFS[moduleId];
   const params = state.moduleParams[moduleId];
   const mode   = moduleId === 'halftone' ? params.mode : null;
+
+  // Clear stale angle chip draw registry for this panel session
+  _angleDrawers = {};
 
   def.params.forEach(p => {
     // Halftone mode visibility filtering
