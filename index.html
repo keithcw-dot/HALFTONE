@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HALFTONE</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="header">
+  <div class="title">HALFTONE</div>
+  <div class="subtitle">PHOTOMECHANICAL PROCESS SIMULATOR</div>
+  <select id="preset-select">
+    <option value="">— SELECT PRESET —</option>
+    <option value="1963 NEWSPRINT">1963 NEWSPRINT</option>
+    <option value="1975 OFFSET ZINE">1975 OFFSET ZINE</option>
+    <option value="1985 MAGAZINE">1985 MAGAZINE</option>
+    <option value="VELOX STATS">VELOX STATS</option>
+    <option value="RISOGRAPH">RISOGRAPH</option>
+    <option value="CMYK CLEAN">CMYK CLEAN</option>
+  </select>
+  <div id="render-status"></div>
+  <button class="header-btn" id="btn-hq"     onclick="toggleHQ()"     title="Force 1:1 render resolution for live preview (Performance heavy)">[ ] HQ PREV</button>
+  <button class="header-btn" id="btn-prev2x" onclick="togglePrev2x()" title="Force 2x render resolution for live preview">[ ] 2X PREV</button>
+  <button class="header-btn" id="btn-loupe"  onclick="toggleLoupe()"  title="Toggle 200% pixel loupe — click and drag on preview to inspect full resolution">⊙ LOUPE 2X</button>
+  <div class="export-wrap">
+    <button class="header-btn primary" id="btn-export" onclick="toggleExportDropdown(event)">↓ EXPORT</button>
+    <div class="export-dropdown" id="export-dropdown">
+      <div class="ed-title">EXPORT OPTIONS</div>
+      <div class="ed-row">
+        <span class="ed-label">INPUT UPSCALE</span>
+        <select class="ed-select" id="export-upscale" onchange="state.exportUpscale = +this.value; updateExportSize();">
+          <option value="1">1× (native)</option>
+          <option value="2">2×</option>
+          <option value="3">3×</option>
+          <option value="4">4×</option>
+        </select>
+      </div>
+      <div class="ed-row">
+        <span class="ed-label">OUTPUT SIZE</span>
+        <span class="ed-value" id="export-size-label">—</span>
+      </div>
+      <button class="ed-btn" onclick="exportImage()">↓ EXPORT PNG</button>
+    </div>
+  </div>
+</div>
+
+<div id="canvas-area">
+  <div id="drop-zone">
+    <div class="drop-icon">◉</div>
+    <div class="drop-label">DROP IMAGE HERE</div>
+    <div class="drop-sub">OR CLICK TO BROWSE — JPG, PNG, WEBP</div>
+  </div>
+  <div id="canvas-container">
+    <canvas id="preview-canvas"></canvas>
+    <div id="split-line"></div>
+    <div id="loupe">
+      <canvas id="loupe-canvas" width="220" height="220"></canvas>
+      <div id="loupe-label">200%</div>
+    </div>
+  </div>
+  <div id="processing"><div class="proc-text">PROCESSING…</div></div>
+</div>
+
+<div id="module-panel">
+  <div id="module-panel-inner">
+    <div id="module-panel-title">
+      <span id="panel-module-name">HALFTONE</span>
+      <span id="panel-group-tag" class="group-tag">SCREEN</span>
+      <span id="panel-desc" class="panel-desc"></span>
+    </div>
+    <div id="controls-row"></div>
+  </div>
+</div>
+
+<div id="pipeline-strip">
+  <!-- built by JS -->
+</div>
+
+<input type="file" id="file-input" accept="image/*" style="display:none">
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
