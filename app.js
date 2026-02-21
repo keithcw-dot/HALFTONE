@@ -437,8 +437,7 @@ function buildColorControl(p, params, item, moduleId) {
     params[p.id] = input.value; swatch.style.background = input.value;
     if (moduleId === 'halftone') {
       buildPipelineStrip();
-      // Duotone color changes affect the angle chip previews
-      Object.values(_angleDrawers).forEach(fn => fn());
+      Object.values(_htDrawers).forEach(fn => fn());
     }
     scheduleRender();
   });
@@ -758,9 +757,29 @@ function buildSlurChip(p, params, item) {
 // ─── Angle chip for halftone screen angles ───────────────────────
 // Registry of draw functions keyed by param id. Cleared each time
 // buildControls runs so stale closures don't accumulate across panel opens.
-let _angleDrawers = {};
+// ─── Halftone chip helpers & unified draw registry ───────────────
+// All halftone chip draw fns register here, keyed by param id.
+// Cleared each buildControls() call — no stale closures across panel opens.
+let _htDrawers = {};
 
-function _drawDots(ctx, w, h, angleDeg, inkHex, cellPx) {
+function _drawShape(ctx, cx, cy, r, shape) {
+  ctx.beginPath();
+  if (shape === 'diamond') {
+    ctx.moveTo(cx, cy - r * 1.3);
+    ctx.lineTo(cx + r * 1.3, cy);
+    ctx.lineTo(cx, cy + r * 1.3);
+    ctx.lineTo(cx - r * 1.3, cy);
+    ctx.closePath();
+  } else if (shape === 'line') {
+    ctx.rect(cx - r * 1.7, cy - r * 0.38, r * 3.4, r * 0.76);
+  } else {
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  }
+  ctx.fill();
+}
+
+function _drawDots(ctx, w, h, angleDeg, inkHex, cellPx, shape) {
+  shape = shape || 'circle';
   const rad  = angleDeg * Math.PI / 180;
   const cosA = Math.cos(rad), sinA = Math.sin(rad);
   const diag = Math.ceil(Math.sqrt(w * w + h * h) / 2) + cellPx * 2;
@@ -772,7 +791,7 @@ function _drawDots(ctx, w, h, angleDeg, inkHex, cellPx) {
       const x = cx + gx * cosA - gy * sinA;
       const y = cy + gx * sinA + gy * cosA;
       if (x < -cellPx || x > w + cellPx || y < -cellPx || y > h + cellPx) continue;
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      _drawShape(ctx, x, y, r, shape);
     }
   }
 }
@@ -785,28 +804,102 @@ function _angleInkColor(id, params, mode) {
   return { angleK: '#1a1612', angleC: '#009fce', angleM: '#d4006a', angleY: '#f5d800' }[id] || '#444';
 }
 
-function buildAngleChip(p, params, item, moduleId) {
+// Helper: fill canvas with paper color then draw dots
+function _fillPaper(ctx, w, h, params) {
+  ctx.fillStyle = params.paperColor || '#f0ead8';
+  ctx.fillRect(0, 0, w, h);
+}
+
+// ─── Mode chip ───────────────────────────────────────────────────
+function buildModeChip(p, params, item, moduleId, container) {
   item.className = 'ctrl-custom-wrap';
   item.innerHTML = '';
 
-  const mode   = params.mode;
-  const CELL   = 11;
-  const CW = 120, CH = 110;
+  const chip = document.createElement('div');
+  chip.className = 'press-chip';
+  chip.style.cssText = 'flex-direction:row; gap:6px; padding:10px;';
+  item.appendChild(chip);
+
+  const CW = 72, CH = 130;
+  const MODES = [
+    { val: 'bw',      label: 'B&W' },
+    { val: 'duotone', label: 'DUO' },
+    { val: 'cmyk',    label: 'CMYK' },
+  ];
+
+  const canvases = {};
+
+  function drawMode(m, canvas) {
+    const ctx = canvas.getContext('2d');
+    _fillPaper(ctx, CW, CH, params);
+    const shape = params.dotShape || 'circle';
+    const cell  = Math.max(params.cellSize || 10, 8);
+    const gco   = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'multiply';
+    if (m.val === 'bw') {
+      _drawDots(ctx, CW, CH, 45, '#1a1612', cell, shape);
+    } else if (m.val === 'duotone') {
+      _drawDots(ctx, CW, CH, 45, params.duotoneColor1 || '#1a1008', cell, shape);
+      _drawDots(ctx, CW, CH, 75, params.duotoneColor2 || '#d4890a', cell, shape);
+    } else {
+      _drawDots(ctx, CW, CH, 45, '#1a1612', cell, shape);
+      _drawDots(ctx, CW, CH, 15, '#009fce', cell, shape);
+      _drawDots(ctx, CW, CH, 75, '#d4006a', cell, shape);
+      _drawDots(ctx, CW, CH, 90, '#f5d800', cell, shape);
+    }
+    ctx.globalCompositeOperation = gco;
+  }
+
+  MODES.forEach(m => {
+    const card = document.createElement('div');
+    card.className = 'ht-option-card' + (params[p.id] === m.val ? ' active' : '');
+
+    const canvas = document.createElement('canvas');
+    canvas.width = CW; canvas.height = CH;
+    canvases[m.val] = canvas;
+    drawMode(m, canvas);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'press-seq-label';
+    lbl.textContent = m.label;
+
+    card.appendChild(canvas);
+    card.appendChild(lbl);
+    chip.appendChild(card);
+
+    card.addEventListener('click', () => {
+      params[p.id] = m.val;
+      chip.querySelectorAll('.ht-option-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      container.innerHTML = '';
+      buildControls(container, moduleId);
+      buildPipelineStrip();
+      scheduleRender();
+    });
+  });
+
+  _htDrawers[p.id] = () => MODES.forEach(m => drawMode(m, canvases[m.val]));
+}
+
+// ─── Screen (cell size) chip ─────────────────────────────────────
+function buildScreenChip(p, params, item) {
+  item.className = 'ctrl-custom-wrap';
+  item.innerHTML = '';
 
   const chip = document.createElement('div');
   chip.className = 'press-chip';
   chip.style.gap = '8px';
+  item.appendChild(chip);
 
-  // Canvas preview area
+  const CW = 120, CH = 120;
   const wrap = document.createElement('div');
   wrap.className = 'press-svg-wrap';
-  wrap.style.cssText = `width:${CW}px; height:${CH}px; flex-shrink:0;`;
+  wrap.style.cssText = `width:${CW}px; height:${CH}px;`;
   const canvas = document.createElement('canvas');
   canvas.width = CW; canvas.height = CH;
   wrap.appendChild(canvas);
   chip.appendChild(wrap);
 
-  // Angle slider
   const slider = document.createElement('input');
   slider.type = 'range';
   slider.className = 'press-hslider';
@@ -815,7 +908,191 @@ function buildAngleChip(p, params, item, moduleId) {
   slider.value = params[p.id];
   chip.appendChild(slider);
 
-  // Label at bottom of chip
+  const lbl = document.createElement('div');
+  lbl.className = 'press-seq-label';
+  chip.appendChild(lbl);
+
+  function draw() {
+    const ctx = canvas.getContext('2d');
+    const cell  = params[p.id];
+    const shape = params.dotShape || 'circle';
+    const mode  = params.mode;
+    _fillPaper(ctx, CW, CH, params);
+    const gco = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'multiply';
+    if (mode === 'bw') {
+      _drawDots(ctx, CW, CH, 45, '#1a1612', cell, shape);
+    } else if (mode === 'duotone') {
+      _drawDots(ctx, CW, CH, 45, params.duotoneColor1 || '#1a1008', cell, shape);
+      _drawDots(ctx, CW, CH, 75, params.duotoneColor2 || '#d4890a', cell, shape);
+    } else {
+      _drawDots(ctx, CW, CH, 45, '#1a1612', cell, shape);
+      _drawDots(ctx, CW, CH, 15, '#009fce', cell, shape);
+      _drawDots(ctx, CW, CH, 75, '#d4006a', cell, shape);
+      _drawDots(ctx, CW, CH, 90, '#f5d800', cell, shape);
+    }
+    ctx.globalCompositeOperation = gco;
+    lbl.textContent = cell + ' px';
+  }
+
+  _htDrawers[p.id] = draw;
+  draw();
+
+  slider.addEventListener('input', () => {
+    params[p.id] = parseInt(slider.value);
+    draw();
+    scheduleRender();
+  });
+}
+
+// ─── Dot shape chip ──────────────────────────────────────────────
+function buildDotShapeChip(p, params, item) {
+  item.className = 'ctrl-custom-wrap';
+  item.innerHTML = '';
+
+  const chip = document.createElement('div');
+  chip.className = 'press-chip';
+  chip.style.cssText = 'flex-direction:row; gap:6px; padding:10px;';
+  item.appendChild(chip);
+
+  const CW = 72, CH = 130;
+  const SHAPES = [
+    { val: 'circle',  label: '●' },
+    { val: 'diamond', label: '◆' },
+    { val: 'line',    label: '▬' },
+  ];
+
+  const canvases = {};
+
+  function drawShape(s, canvas) {
+    const ctx = canvas.getContext('2d');
+    const cell = Math.max(params.cellSize || 10, 10);
+    _fillPaper(ctx, CW, CH, params);
+    const gco = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'multiply';
+    _drawDots(ctx, CW, CH, 45, '#1a1612', cell, s.val);
+    ctx.globalCompositeOperation = gco;
+  }
+
+  SHAPES.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'ht-option-card' + (params[p.id] === s.val ? ' active' : '');
+
+    const canvas = document.createElement('canvas');
+    canvas.width = CW; canvas.height = CH;
+    canvases[s.val] = canvas;
+    drawShape(s, canvas);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'press-seq-label';
+    lbl.textContent = s.label;
+
+    card.appendChild(canvas);
+    card.appendChild(lbl);
+    chip.appendChild(card);
+
+    card.addEventListener('click', () => {
+      params[p.id] = s.val;
+      chip.querySelectorAll('.ht-option-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      // Cascade to other previews — angle/screen chips should show new shape
+      Object.entries(_htDrawers).forEach(([id, fn]) => { if (id !== p.id) fn(); });
+      scheduleRender();
+    });
+  });
+
+  _htDrawers[p.id] = () => SHAPES.forEach(s => drawShape(s, canvases[s.val]));
+}
+
+// ─── Paper color chip ────────────────────────────────────────────
+function buildPaperChip(p, params, item) {
+  item.className = 'ctrl-custom-wrap';
+  item.innerHTML = '';
+
+  const chip = document.createElement('div');
+  chip.className = 'press-chip';
+  chip.style.gap = '8px';
+  item.appendChild(chip);
+
+  const CW = 120, CH = 120;
+  const wrap = document.createElement('div');
+  wrap.className = 'press-svg-wrap';
+  wrap.style.cssText = `width:${CW}px; height:${CH}px; cursor:pointer;`;
+  const canvas = document.createElement('canvas');
+  canvas.width = CW; canvas.height = CH;
+  wrap.appendChild(canvas);
+  chip.appendChild(wrap);
+
+  // Hidden color input, triggered by clicking the swatch
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.style.cssText = 'position:absolute; opacity:0; pointer-events:none; width:0; height:0;';
+  chip.appendChild(input);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'press-seq-label';
+  lbl.textContent = 'PAPER';
+  chip.appendChild(lbl);
+
+  function draw() {
+    const ctx = canvas.getContext('2d');
+    const col = params[p.id];
+    ctx.fillStyle = col;
+    ctx.fillRect(0, 0, CW, CH);
+    // Subtle fiber texture suggestion
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle = '#000';
+    for (let y = 0; y < CH; y += 3) {
+      if (Math.random() > 0.6) {
+        ctx.fillRect(0, y, CW * (0.3 + Math.random() * 0.7), 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+    input.value = col;
+  }
+
+  _htDrawers[p.id] = draw;
+  draw();
+
+  wrap.addEventListener('click', () => input.click());
+  input.addEventListener('input', () => {
+    params[p.id] = input.value;
+    draw();
+    // Paper color change cascades to all dot-field previews
+    Object.entries(_htDrawers).forEach(([id, fn]) => { if (id !== p.id) fn(); });
+    scheduleRender();
+  });
+}
+
+// ─── Angle chip ──────────────────────────────────────────────────
+function buildAngleChip(p, params, item) {
+  item.className = 'ctrl-custom-wrap';
+  item.innerHTML = '';
+
+  const mode = params.mode;
+  const CELL = 11;
+  const CW = 120, CH = 110;
+
+  const chip = document.createElement('div');
+  chip.className = 'press-chip';
+  chip.style.gap = '8px';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'press-svg-wrap';
+  wrap.style.cssText = `width:${CW}px; height:${CH}px; flex-shrink:0;`;
+  const canvas = document.createElement('canvas');
+  canvas.width = CW; canvas.height = CH;
+  wrap.appendChild(canvas);
+  chip.appendChild(wrap);
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'press-hslider';
+  slider.style.width = CW + 'px';
+  slider.min = p.min; slider.max = p.max; slider.step = p.step;
+  slider.value = params[p.id];
+  chip.appendChild(slider);
+
   const lbl = document.createElement('div');
   lbl.className = 'press-seq-label';
   lbl.textContent = p.label;
@@ -825,50 +1102,39 @@ function buildAngleChip(p, params, item, moduleId) {
 
   function draw() {
     const ctx = canvas.getContext('2d');
-    const paper = params.paperColor || '#f0ead8';
-    ctx.fillStyle = paper;
-    ctx.fillRect(0, 0, CW, CH);
-
+    const shape  = params.dotShape || 'circle';
     const master = params.masterAngle || 0;
-
+    _fillPaper(ctx, CW, CH, params);
+    const gco = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'multiply';
     if (p.master) {
-      // Overlay all active channels at their actual angles
-      const savedGCO = ctx.globalCompositeOperation;
-      ctx.globalCompositeOperation = 'multiply';
       const allIds = ['angleK','angleC','angleM','angleY'];
       const visible = mode === 'bw' ? ['angleK'] : mode === 'duotone' ? ['angleK','angleC'] : allIds;
       for (const id of visible) {
-        _drawDots(ctx, CW, CH, (params[id] || 0) + master, _angleInkColor(id, params, mode), CELL);
+        _drawDots(ctx, CW, CH, (params[id] || 0) + master, _angleInkColor(id, params, mode), CELL, shape);
       }
-      ctx.globalCompositeOperation = savedGCO;
     } else {
-      // Individual plate: show actual angle (own + master offset)
-      _drawDots(ctx, CW, CH, params[p.id] + master, _angleInkColor(p.id, params, mode), CELL);
+      _drawDots(ctx, CW, CH, params[p.id] + master, _angleInkColor(p.id, params, mode), CELL, shape);
     }
+    ctx.globalCompositeOperation = gco;
   }
 
-  _angleDrawers[p.id] = draw;
+  _htDrawers[p.id] = draw;
   draw();
 
   slider.addEventListener('input', (e) => {
     params[p.id] = parseFloat(e.target.value);
     draw();
     if (p.master) {
-      // Master moved → all plate chips need to show new actual angles
-      Object.entries(_angleDrawers).forEach(([id, fn]) => { if (id !== 'masterAngle') fn(); });
+      Object.entries(_htDrawers).forEach(([id, fn]) => { if (id !== 'masterAngle') fn(); });
     } else {
-      // Plate moved → master overlay needs to update
-      if (_angleDrawers['masterAngle']) _angleDrawers['masterAngle']();
+      if (_htDrawers['masterAngle']) _htDrawers['masterAngle']();
     }
     scheduleRender();
   });
 }
 
 // ─── Dispatch table ──────────────────────────────────────────────
-// Maps param type → builder function. Standard controls get a label
-// prepended automatically; chip builders call buildChipLabel() themselves
-// and override item.className, so the standard label is harmless (they
-// clear innerHTML internally via buildChipLabel).
 const CONTROL_BUILDERS = {
   'slider':           buildSliderControl,
   'select':           buildSelectControl,
@@ -879,6 +1145,10 @@ const CONTROL_BUILDERS = {
   'feed-chip':        buildFeedChip,
   'laydown-chip':     buildLaydownChip,
   'slur-chip':        buildSlurChip,
+  'mode-chip':        buildModeChip,
+  'screen-chip':      buildScreenChip,
+  'dotshape-chip':    buildDotShapeChip,
+  'paper-chip':       buildPaperChip,
   'angle-chip':       buildAngleChip,
 };
 
@@ -887,8 +1157,8 @@ function buildControls(container, moduleId) {
   const params = state.moduleParams[moduleId];
   const mode   = moduleId === 'halftone' ? params.mode : null;
 
-  // Clear stale angle chip draw registry for this panel session
-  _angleDrawers = {};
+  // Clear stale chip draw registries
+  _htDrawers = {};
 
   def.params.forEach(p => {
     // Halftone mode visibility filtering
@@ -899,7 +1169,7 @@ function buildControls(container, moduleId) {
     const item = document.createElement('div');
     item.className = 'ctrl-item';
 
-    // Standard label — chip builders replace this by calling buildChipLabel()
+    // Standard label — chip builders override item.className and innerHTML themselves
     const label = document.createElement('div');
     label.className = 'ctrl-label' + (p.labelClass ? ' ' + p.labelClass : '');
     label.textContent = p.label;
