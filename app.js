@@ -1111,7 +1111,8 @@ function buildAngleChip(p, params, item) {
 
   const lbl = document.createElement('div');
   lbl.className = 'press-seq-label';
-  lbl.textContent = p.label;
+  const duotoneLabels = { angleK: 'COLOR 1', angleC: 'COLOR 2' };
+  lbl.textContent = (mode === 'duotone' && duotoneLabels[p.id]) ? duotoneLabels[p.id] : p.label;
   chip.appendChild(lbl);
 
   item.appendChild(chip);
