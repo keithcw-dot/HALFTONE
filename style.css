@@ -512,8 +512,8 @@ body {
 .add-module-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 .add-dropdown {
-  position: absolute; bottom: calc(100% + 6px); left: 0; background: var(--surf2);
-  border: 1px solid var(--border2); z-index: 100; min-width: 150px; display: none;
+  position: fixed; background: var(--surf2);
+  border: 1px solid var(--border2); z-index: 1000; min-width: 150px; display: none;
 }
 .add-dropdown.open { display: block; }
 .add-dropdown-item {

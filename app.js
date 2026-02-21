@@ -285,26 +285,29 @@ function buildPipelineStrip() {
 
     section.appendChild(chips);
 
-    // ── group label + add btn (right of chips) ─────────────────────
-    const head = document.createElement('div');
-    head.className = 'group-head';
-    const label = document.createElement('div');
-    label.className = 'group-name';
-    label.textContent = groupName;
-    head.appendChild(label);
-
+    // ── group label + add btn (only for groups that have addable modules) ──
     const addable   = GROUP_MODULES[groupName].filter(id => MODULE_DEFS[id].removable);
     const notActive = addable.filter(id => !state.activeModules.has(id));
     if (addable.length > 0) {
-      const addBtn   = document.createElement('button');
+      const head = document.createElement('div');
+      head.className = 'group-head';
+      const label = document.createElement('div');
+      label.className = 'group-name';
+      label.textContent = groupName;
+      head.appendChild(label);
+
+      const addBtn = document.createElement('button');
       addBtn.className = 'add-module-btn';
       addBtn.textContent = '+';
-      const dropdown = document.createElement('div');
-      dropdown.className = 'add-dropdown';
 
       if (notActive.length === 0) {
         addBtn.style.opacity = '0.3'; addBtn.disabled = true;
       } else {
+        // Dropdown appended to body to escape overflow clipping on the strip
+        const dropdown = document.createElement('div');
+        dropdown.className = 'add-dropdown';
+        document.body.appendChild(dropdown);
+
         notActive.forEach(id => {
           const item = document.createElement('div');
           item.className = 'add-dropdown-item';
@@ -317,13 +320,23 @@ function buildPipelineStrip() {
           });
           dropdown.appendChild(item);
         });
-        addBtn.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('open'); });
+
+        addBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Close any other open dropdowns
+          document.querySelectorAll('.add-dropdown.open').forEach(d => d.classList.remove('open'));
+          const rect = addBtn.getBoundingClientRect();
+          dropdown.style.left   = rect.left + 'px';
+          dropdown.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+          dropdown.style.top    = 'auto';
+          dropdown.classList.toggle('open');
+        });
       }
-      addBtn.appendChild(dropdown);
+
       head.appendChild(addBtn);
+      section.appendChild(head);
     }
 
-    section.appendChild(head);
     strip.appendChild(section);
   });
 }
@@ -898,8 +911,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Close any open dropdowns on outside click
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.add-module-btn'))  document.querySelectorAll('.add-dropdown.open').forEach(d => d.classList.remove('open'));
-    if (!e.target.closest('.export-wrap'))      document.getElementById('export-dropdown').classList.remove('open');
+    if (!e.target.closest('.add-module-btn') && !e.target.closest('.add-dropdown')) {
+      document.querySelectorAll('.add-dropdown.open').forEach(d => d.classList.remove('open'));
+    }
+    if (!e.target.closest('.export-wrap')) document.getElementById('export-dropdown').classList.remove('open');
   });
 
   window.addEventListener('resize', () => { if (state.processedCanvas) drawSplit(); });
