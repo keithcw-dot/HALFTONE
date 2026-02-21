@@ -531,6 +531,7 @@ function buildPressureChip(p, params, item) {
             .p-hub2{fill:none;stroke:#b8b0a0;stroke-width:1;stroke-miterlimit:4.8}
             .p-paper{fill:#e8e0d0}
           </style>
+          <g transform="translate(160,0) scale(-1,1)">
           <path class="p-body" d="M57.2,90.8l41.4-34.7c7.1-6,17.7-5,23.7,2.1s5,17.7-2.1,23.7l-41.4,34.7-21.6-25.7Z"/>
           <circle class="p-face" cx="68" cy="103.7" r="16.8"/>
           <g class="motion-f1"><circle class="p-hub"  cx="68" cy="103.7" r="4.8"/></g>
@@ -541,6 +542,7 @@ function buildPressureChip(p, params, item) {
             <circle class="p-face" cx="68" cy="86.9" r="16.8"/>
             <g class="motion-f1"><circle class="p-hub"  cx="68" cy="86.9" r="4.8"/></g>
             <g class="motion-f2"><circle class="p-hub2" cx="68" cy="86.9" r="9"/></g>
+          </g>
           </g>
         </svg>
       </div>
@@ -567,6 +569,7 @@ function buildFeedChip(p, params, item) {
       <div class="press-fstate ${params[p.id] === 'horizontal' ? 'active' : ''}" data-feed="horizontal">
         <svg viewBox="609.6 11.6 142.5 142.5" width="142" height="142" xmlns="http://www.w3.org/2000/svg">
           <style>.fd-paper{fill:#ffebc6}.fd-roll{fill:#928875}.fd-hub{fill:#ffebc6}.fd-arrow{fill:#231f20}.fd-arc{fill:none;stroke:#fff;stroke-linecap:round;stroke-miterlimit:1.7;stroke-width:1.3}</style>
+          <g transform="translate(1362.2,0) scale(-1,1)">
           <path class="fd-paper" d="M691.4,129.6l24-24c7.4-7.4,7.4-19.5,0-27-7.4-7.4-19.5-7.4-27,0l-24,24"/>
           <circle class="fd-roll" cx="677.9" cy="116.2" r="19.1"/>
           <circle class="fd-hub"  cx="677.9" cy="116.2" r="5.4"/>
@@ -582,10 +585,12 @@ function buildFeedChip(p, params, item) {
             <polygon class="fd-arrow" points="664.2 76.9 656.8 88 652.2 88 646.7 93.5 644.1 93.5 649.6 88 644.1 88 664.2 76.9"/>
             <polygon class="fd-arrow" points="681.1 76.9 673.6 88 669.1 88 663.5 93.5 660.9 93.5 666.5 88 660.9 88 681.1 76.9"/>
           </g>
+          </g>
         </svg>
       </div>
       <div class="press-fstate ${params[p.id] === 'vertical' ? 'active' : ''}" data-feed="vertical">
         <svg viewBox="609.6 11.6 142.5 142.5" width="142" height="142" xmlns="http://www.w3.org/2000/svg">
+          <g transform="translate(1362.2,0) scale(-1,1)">
           <path class="fd-paper" d="M691.4,129.6l24-24c7.4-7.4,7.4-19.5,0-27-7.4-7.4-19.5-7.4-27,0l-24,24"/>
           <circle class="fd-roll" cx="677.9" cy="116.2" r="19.1"/>
           <circle class="fd-hub"  cx="677.9" cy="116.2" r="5.4"/>
@@ -600,6 +605,7 @@ function buildFeedChip(p, params, item) {
           <g class="press-fb" transform="rotate(90,662,85.2)">
             <polygon class="fd-arrow" points="664.2 76.9 656.8 88 652.2 88 646.7 93.5 644.1 93.5 649.6 88 644.1 88 664.2 76.9"/>
             <polygon class="fd-arrow" points="681.1 76.9 673.6 88 669.1 88 663.5 93.5 660.9 93.5 666.5 88 660.9 88 681.1 76.9"/>
+          </g>
           </g>
         </svg>
       </div>
@@ -647,6 +653,7 @@ function buildLaydownChip(p, params, item) {
   chip.innerHTML = `
     <div class="press-svg-wrap" style="width:160px">
       <svg viewBox="200 11.6 160 142.5" width="160" height="142" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(560,0) scale(-1,1)">
         <rect x="200" y="73.1" width="160" height="24" fill="#e8e0d0"/>
         <g class="press-z1">
           <line x1="345" y1="80" x2="300" y2="80" stroke="#b0a890" stroke-width="1.2"/>
@@ -659,6 +666,7 @@ function buildLaydownChip(p, params, item) {
           <line x1="356" y1="90" x2="318" y2="90" stroke="#b0a890" stroke-width="1.2"/>
         </g>
         <g class="ld-rollers"></g>
+        </g>
       </svg>
     </div>
     <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:160px">
@@ -703,6 +711,7 @@ function buildSlurChip(p, params, item) {
   chip.innerHTML = `
     <div class="press-svg-wrap" style="width:160px">
       <svg viewBox="399 11.6 160 142.5" width="160" height="142" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(958,0) scale(-1,1)">
         <path d="M492.3,63.9l29.1-24.4c5.1-4.3,12.6-3.6,16.9,1.5s3.6,12.6-1.5,16.9l-29.1,24.4-15.4-18.4Z" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-linejoin="round" stroke-miterlimit="4"/>
         <circle cx="500" cy="73.1" r="12" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-miterlimit="4"/>
         <g class="motion-f1"><circle cx="500" cy="73.1" r="4" fill="none" stroke="#ccc" stroke-width="1.5"/></g>
@@ -723,6 +732,7 @@ function buildSlurChip(p, params, item) {
         <circle cx="500" cy="73.1" r="12" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-miterlimit="4"/>
         <g class="motion-f1"><circle cx="500" cy="73.1" r="4" fill="none" stroke="#ccc" stroke-width="1.5"/></g>
         <g class="motion-f2"><circle cx="500" cy="73.1" r="7" fill="none" stroke="#ccc" stroke-width="1"/></g>
+        </g>
       </svg>
     </div>
     <input type="range" class="press-hslider" style="width:160px" min="${p.min}" max="${p.max}" step="${p.step}" value="${params[p.id]}">
