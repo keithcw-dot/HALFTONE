@@ -381,6 +381,7 @@ function buildSliderControl(p, params, item) {
   slider.type = 'range';
   slider.className = 'ctrl-slider' + (p.width ? ' ' + p.width : '');
   slider.min = p.min; slider.max = p.max; slider.step = p.step; slider.value = params[p.id];
+  slider.title = 'Double-click to reset to default';
 
   const val = document.createElement('div');
   val.className = 'ctrl-value' + (p.width === 'narrow' ? ' small' : '');
@@ -389,6 +390,10 @@ function buildSliderControl(p, params, item) {
   slider.addEventListener('input', () => {
     const v = parseFloat(slider.value);
     params[p.id] = v; val.textContent = formatVal(v, p); scheduleRender();
+  });
+  slider.addEventListener('dblclick', () => {
+    params[p.id] = p.default; slider.value = p.default;
+    val.textContent = formatVal(p.default, p); scheduleRender();
   });
   item.appendChild(slider); item.appendChild(val);
 }
@@ -1208,22 +1213,194 @@ function buildDuotoneColorChip(p, params, item) {
 }
 
 
+// ─── Ink skip chip ───────────────────────────────────────────────
+// Intensity: shows the void coverage (how much ink is missing)
+// Scale: shows the band width (how coarse the starvation pattern is)
+function buildInkSkipChip(p, params, item) {
+  item.className = 'ctrl-custom-wrap';
+  item.innerHTML = '';
+
+  const chip = document.createElement('div');
+  chip.className = 'press-chip';
+  chip.style.gap = '8px';
+  item.appendChild(chip);
+
+  const CW = 130, CH = 110;
+  const wrap = document.createElement('div');
+  wrap.className = 'press-svg-wrap';
+  wrap.style.cssText = `width:${CW}px; height:${CH}px;`;
+  const canvas = document.createElement('canvas');
+  canvas.width = CW; canvas.height = CH;
+  wrap.appendChild(canvas);
+  chip.appendChild(wrap);
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'press-hslider';
+  slider.style.width = CW + 'px';
+  slider.min = p.min; slider.max = p.max; slider.step = p.step;
+  slider.value = params[p.id];
+  chip.appendChild(slider);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'press-seq-label';
+  lbl.textContent = p.label;
+  chip.appendChild(lbl);
+
+  // Seeded pseudo-random using param id as seed offset
+  function seededRand(seed) {
+    let s = seed;
+    return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
+  }
+
+  function draw() {
+    const ctx  = canvas.getContext('2d');
+    const intensity = params.intensity ?? 0.3;
+    const scale     = params.scale     ?? 0.4;
+
+    // Paper base
+    ctx.fillStyle = '#e8e0d0';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Draw a dot field first — ink skip voids over actual dots
+    const cell = 9;
+    ctx.fillStyle = '#1a1612';
+    for (let gy = 0; gy < CH + cell; gy += cell) {
+      for (let gx = 0; gx < CW + cell; gx += cell) {
+        ctx.beginPath();
+        ctx.arc(gx, gy, cell * 0.32, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Overlay void bands (horizontal — feed direction)
+    const bandH = Math.max(3, scale * 40);   // band height from scale
+    const rand  = seededRand(p.id === 'scale' ? 42 : 7);
+    let y = 0;
+    while (y < CH) {
+      const gap = bandH * (0.5 + rand() * 2.5);
+      y += gap;
+      if (rand() < intensity) {
+        const bh = Math.max(2, bandH * (0.4 + rand() * 0.8));
+        ctx.fillStyle = `rgba(232,224,208,${0.5 + intensity * 0.5})`;
+        ctx.fillRect(0, y, CW, bh);
+        y += bh;
+      }
+    }
+  }
+
+  draw();
+  slider.addEventListener('input', () => {
+    params[p.id] = parseFloat(slider.value);
+    draw(); scheduleRender();
+  });
+  slider.addEventListener('dblclick', () => {
+    params[p.id] = p.default; slider.value = p.default; draw(); scheduleRender();
+  });
+}
+
+// ─── Paper tooth chip ────────────────────────────────────────────
+// texture: random grain noise
+// fibers:  directional streaks along feed axis
+function buildPaperToothChip(p, params, item) {
+  item.className = 'ctrl-custom-wrap';
+  item.innerHTML = '';
+
+  const chip = document.createElement('div');
+  chip.className = 'press-chip';
+  chip.style.gap = '8px';
+  item.appendChild(chip);
+
+  const CW = 130, CH = 110;
+  const wrap = document.createElement('div');
+  wrap.className = 'press-svg-wrap';
+  wrap.style.cssText = `width:${CW}px; height:${CH}px;`;
+  const canvas = document.createElement('canvas');
+  canvas.width = CW; canvas.height = CH;
+  wrap.appendChild(canvas);
+  chip.appendChild(wrap);
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'press-hslider';
+  slider.style.width = CW + 'px';
+  slider.min = p.min; slider.max = p.max; slider.step = p.step;
+  slider.value = params[p.id];
+  chip.appendChild(slider);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'press-seq-label';
+  lbl.textContent = p.label;
+  chip.appendChild(lbl);
+
+  // Build stable noise buffers once (seeded LCG so they don't flicker)
+  const GRAIN = new Float32Array(CW * CH);
+  const FIBER = new Float32Array(CW * CH);
+  let s1 = 0xdeadbeef, s2 = 0xcafebabe;
+  const lcg1 = () => { s1 = (s1 * 1664525 + 1013904223) & 0xffffffff; return (s1 >>> 0) / 0xffffffff; };
+  const lcg2 = () => { s2 = (s2 * 22695477  + 1)         & 0xffffffff; return (s2 >>> 0) / 0xffffffff; };
+  for (let i = 0; i < CW * CH; i++) GRAIN[i] = lcg1();
+  // Fibers: smooth along x, noisy across y
+  for (let y = 0; y < CH; y++) {
+    let streak = lcg2() > 0.85 ? lcg2() : 0; // sparse streaks
+    for (let x = 0; x < CW; x++) {
+      if (x % 8 === 0) streak = lcg2() > 0.82 ? lcg2() : 0;
+      FIBER[y * CW + x] = streak;
+    }
+  }
+
+  function draw() {
+    const ctx   = canvas.getContext('2d');
+    const val   = params[p.id];
+    const paper = [232, 224, 208]; // #e8e0d0
+
+    const imgData = ctx.createImageData(CW, CH);
+    const d = imgData.data;
+    for (let i = 0; i < CW * CH; i++) {
+      let dark;
+      if (p.kind === 'fibers') {
+        dark = FIBER[i] * val * 2.5;
+      } else {
+        dark = GRAIN[i] < val * 3 ? (GRAIN[i] / (val * 3 + 0.001)) * val * 1.5 : 0;
+      }
+      dark = Math.min(1, dark);
+      d[i*4]   = Math.round(paper[0] * (1 - dark));
+      d[i*4+1] = Math.round(paper[1] * (1 - dark));
+      d[i*4+2] = Math.round(paper[2] * (1 - dark));
+      d[i*4+3] = 255;
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  draw();
+  slider.addEventListener('input', () => {
+    params[p.id] = parseFloat(slider.value);
+    draw(); scheduleRender();
+  });
+  slider.addEventListener('dblclick', () => {
+    params[p.id] = p.default; slider.value = p.default; draw(); scheduleRender();
+  });
+}
+
+
 const CONTROL_BUILDERS = {
-  'slider':           buildSliderControl,
-  'select':           buildSelectControl,
-  'toggle':           buildToggleControl,
-  'color':            buildColorControl,
-  'xypad':            buildXYPadControl,
-  'pressure-roller':  buildPressureChip,
-  'feed-chip':        buildFeedChip,
-  'laydown-chip':     buildLaydownChip,
-  'slur-chip':        buildSlurChip,
-  'mode-chip':        buildModeChip,
-  'screen-chip':      buildScreenChip,
-  'dotshape-chip':    buildDotShapeChip,
-  'paper-chip':       buildPaperChip,
+  'slider':             buildSliderControl,
+  'select':             buildSelectControl,
+  'toggle':             buildToggleControl,
+  'color':              buildColorControl,
+  'xypad':              buildXYPadControl,
+  'pressure-roller':    buildPressureChip,
+  'feed-chip':          buildFeedChip,
+  'laydown-chip':       buildLaydownChip,
+  'slur-chip':          buildSlurChip,
+  'mode-chip':          buildModeChip,
+  'screen-chip':        buildScreenChip,
+  'dotshape-chip':      buildDotShapeChip,
+  'paper-chip':         buildPaperChip,
   'duotone-color-chip': buildDuotoneColorChip,
-  'angle-chip':       buildAngleChip,
+  'angle-chip':         buildAngleChip,
+  'inkskip-chip':       buildInkSkipChip,
+  'paper-tooth-chip':   buildPaperToothChip,
 };
 
 function buildControls(container, moduleId) {
@@ -1495,6 +1672,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   buildPresetDropdown();
+
+  // Double-click any press-hslider to reset to its param default
+  document.getElementById('controls-row').addEventListener('dblclick', (e) => {
+    const slider = e.target.closest('.press-hslider');
+    if (!slider || !state.activePanel) return;
+    const def = MODULE_DEFS[state.activePanel];
+    if (!def) return;
+    const params = state.moduleParams[state.activePanel];
+    const paramDef = def.params.find(p =>
+      String(p.min) === slider.min && String(p.max) === slider.max &&
+      String(p.step) === slider.step && p.default !== undefined
+    );
+    if (!paramDef) return;
+    params[paramDef.id] = paramDef.default;
+    slider.value = paramDef.default;
+    slider.dispatchEvent(new Event('input'));
+  });
 
   // Close any open dropdowns on outside click
   document.addEventListener('click', (e) => {

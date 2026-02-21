@@ -75,16 +75,16 @@ const MODULE_DEFS = {
     id: 'inkskip', group: 'PRINT', label: 'INK SKIP', removable: true,
     desc: 'Roller starvation applied per plate. Voids are stretched along the feed direction to form continuous bands.',
     params: [
-      { id: 'intensity', label: 'Intensity', type: 'slider', min: 0,    max: 1,   step: 0.01, default: 0.3 },
-      { id: 'scale',     label: 'Scale',     type: 'slider', min: 0.05, max: 1,   step: 0.01, default: 0.4 },
+      { id: 'intensity', label: 'Intensity', type: 'inkskip-chip', min: 0,    max: 1,   step: 0.01, default: 0.3 },
+      { id: 'scale',     label: 'Scale',     type: 'inkskip-chip', min: 0.05, max: 1,   step: 0.01, default: 0.4 },
     ]
   },
   paper: {
     id: 'paper', group: 'PRINT', label: 'PAPER TOOTH', removable: true,
     desc: 'Surface roughness of the paper stock. Cellulose streaks are structurally aligned to the feed direction.',
     params: [
-      { id: 'texture', label: 'Texture', type: 'slider', min: 0, max: 0.5, step: 0.01, default: 0.15 },
-      { id: 'fibers',  label: 'Fibers',  type: 'slider', min: 0, max: 0.5, step: 0.01, default: 0.05 },
+      { id: 'texture', label: 'Texture', type: 'paper-tooth-chip', kind: 'texture', min: 0, max: 0.5, step: 0.01, default: 0.15 },
+      { id: 'fibers',  label: 'Fibers',  type: 'paper-tooth-chip', kind: 'fibers',  min: 0, max: 0.5, step: 0.01, default: 0.05 },
     ]
   },
   inkbleed: {

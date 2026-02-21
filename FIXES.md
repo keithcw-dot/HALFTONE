@@ -43,3 +43,8 @@
 - [x] Line shape rotates with screen angle in previews
 - [x] cellSize slider cascades redraws to all chip previews
 - [x] GitHub Pages deployment
+- [x] Duotone angle chip labels show COLOR 1 / COLOR 2
+- [x] Ink skip chips (dot field with void bands; intensity + scale)
+- [x] Paper tooth chips (seeded noise grain + directional fiber streaks)
+- [x] Scrollbars beefed up (8px, rounded, hover highlight)
+- [x] Double-click any slider to reset to default
