@@ -19,8 +19,8 @@
   --yel-ink: #d8c800;
   --blk-ink: #1a1612;
   --chip-h: 56px;
-  --strip-h: 90px;
-  --panel-h: 180px;
+  --strip-h: 76px;
+  --panel-h: 280px;
   --header-h: 50px;
 }
 
@@ -486,7 +486,8 @@ body {
   border-top: 1px solid var(--border);
   padding: 0 16px;
   gap: 0;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: visible;
   flex-shrink: 0;
   position: relative;
   z-index: 30;
@@ -497,9 +498,9 @@ body {
 #pipeline-strip::-webkit-scrollbar-thumb { background: var(--border2); }
 
 .pipeline-group { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.group-arrow { color: var(--text-dim); font-size: 18px; padding: 0 12px; opacity: 0.4; flex-shrink: 0; font-weight: bold; }
-.group-section { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
-.group-head { display: flex; align-items: center; gap: 10px; }
+.group-arrow { color: var(--text-dim); font-size: 18px; padding: 0 12px; opacity: 0.4; flex-shrink: 0; font-weight: bold; align-self: center; }
+.group-section { display: flex; flex-direction: row; align-items: center; gap: 8px; flex-shrink: 0; }
+.group-head { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .group-name { font-size: 12px; font-weight: 700; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
 
 .add-module-btn {

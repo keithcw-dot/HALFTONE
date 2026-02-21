@@ -228,48 +228,11 @@ function buildPipelineStrip() {
       strip.appendChild(arrow);
     }
 
+    // section = chips first, then group label + add btn to the right
     const section = document.createElement('div');
     section.className = 'group-section';
 
-    const head = document.createElement('div');
-    head.className = 'group-head';
-    const label = document.createElement('div');
-    label.className = 'group-name';
-    label.textContent = groupName;
-    head.appendChild(label);
-
-    // Add-module button with dropdown
-    const addable  = GROUP_MODULES[groupName].filter(id => MODULE_DEFS[id].removable);
-    const notActive = addable.filter(id => !state.activeModules.has(id));
-    if (addable.length > 0) {
-      const addBtn   = document.createElement('button');
-      addBtn.className = 'add-module-btn';
-      addBtn.textContent = '+';
-      const dropdown = document.createElement('div');
-      dropdown.className = 'add-dropdown';
-
-      if (notActive.length === 0) {
-        addBtn.style.opacity = '0.3'; addBtn.disabled = true;
-      } else {
-        notActive.forEach(id => {
-          const item = document.createElement('div');
-          item.className = 'add-dropdown-item';
-          item.textContent = MODULE_DEFS[id].label;
-          if (MODULE_DEFS[id].desc) item.title = MODULE_DEFS[id].desc;
-          item.addEventListener('click', () => {
-            state.activeModules.add(id);
-            dropdown.classList.remove('open');
-            buildPipelineStrip(); openPanel(id); scheduleRender();
-          });
-          dropdown.appendChild(item);
-        });
-        addBtn.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('open'); });
-      }
-      addBtn.appendChild(dropdown);
-      head.appendChild(addBtn);
-    }
-    section.appendChild(head);
-
+    // ── chips ──────────────────────────────────────────────────────
     const chips = document.createElement('div');
     chips.className = 'chips-row';
 
@@ -281,7 +244,6 @@ function buildPipelineStrip() {
       chip.dataset.id = id;
       if (def.desc) chip.title = def.desc;
 
-      // Halftone chip shows ink colour dots; others show a single accent dot
       if (id === 'halftone') {
         const mode = state.moduleParams.halftone.mode;
         const dots = document.createElement('div');
@@ -322,6 +284,46 @@ function buildPipelineStrip() {
     });
 
     section.appendChild(chips);
+
+    // ── group label + add btn (right of chips) ─────────────────────
+    const head = document.createElement('div');
+    head.className = 'group-head';
+    const label = document.createElement('div');
+    label.className = 'group-name';
+    label.textContent = groupName;
+    head.appendChild(label);
+
+    const addable   = GROUP_MODULES[groupName].filter(id => MODULE_DEFS[id].removable);
+    const notActive = addable.filter(id => !state.activeModules.has(id));
+    if (addable.length > 0) {
+      const addBtn   = document.createElement('button');
+      addBtn.className = 'add-module-btn';
+      addBtn.textContent = '+';
+      const dropdown = document.createElement('div');
+      dropdown.className = 'add-dropdown';
+
+      if (notActive.length === 0) {
+        addBtn.style.opacity = '0.3'; addBtn.disabled = true;
+      } else {
+        notActive.forEach(id => {
+          const item = document.createElement('div');
+          item.className = 'add-dropdown-item';
+          item.textContent = MODULE_DEFS[id].label;
+          if (MODULE_DEFS[id].desc) item.title = MODULE_DEFS[id].desc;
+          item.addEventListener('click', () => {
+            state.activeModules.add(id);
+            dropdown.classList.remove('open');
+            buildPipelineStrip(); openPanel(id); scheduleRender();
+          });
+          dropdown.appendChild(item);
+        });
+        addBtn.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('open'); });
+      }
+      addBtn.appendChild(dropdown);
+      head.appendChild(addBtn);
+    }
+
+    section.appendChild(head);
     strip.appendChild(section);
   });
 }
