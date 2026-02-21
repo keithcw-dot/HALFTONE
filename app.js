@@ -1134,7 +1134,63 @@ function buildAngleChip(p, params, item) {
   });
 }
 
-// ─── Dispatch table ──────────────────────────────────────────────
+// ─── Duotone color chip ──────────────────────────────────────────
+function buildDuotoneColorChip(p, params, item) {
+  item.className = 'ctrl-custom-wrap';
+  item.innerHTML = '';
+
+  const chip = document.createElement('div');
+  chip.className = 'press-chip';
+  chip.style.gap = '8px';
+  item.appendChild(chip);
+
+  const CW = 120, CH = 120;
+  const wrap = document.createElement('div');
+  wrap.className = 'press-svg-wrap';
+  wrap.style.cssText = `width:${CW}px; height:${CH}px; cursor:pointer;`;
+  const canvas = document.createElement('canvas');
+  canvas.width = CW; canvas.height = CH;
+  wrap.appendChild(canvas);
+  chip.appendChild(wrap);
+
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.style.cssText = 'position:absolute; opacity:0; pointer-events:none; width:0; height:0;';
+  chip.appendChild(input);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'press-seq-label';
+  lbl.textContent = p.label;
+  chip.appendChild(lbl);
+
+  function draw() {
+    const ctx = canvas.getContext('2d');
+    const cell   = Math.max(params.cellSize || 10, 8);
+    const shape  = params.dotShape || 'circle';
+    const angle  = (params[p.angleId] || 0) + (params.masterAngle || 0);
+    const color  = params[p.id];
+    _fillPaper(ctx, CW, CH, params);
+    ctx.globalCompositeOperation = 'multiply';
+    _drawDots(ctx, CW, CH, angle, color, cell, shape);
+    ctx.globalCompositeOperation = 'source-over';
+    input.value = color;
+  }
+
+  _htDrawers[p.id] = draw;
+  draw();
+
+  wrap.addEventListener('click', () => input.click());
+  input.addEventListener('input', () => {
+    params[p.id] = input.value;
+    draw();
+    // Cascade — mode chip, screen chip, angle chips all show this color
+    Object.entries(_htDrawers).forEach(([id, fn]) => { if (id !== p.id) fn(); });
+    buildPipelineStrip();
+    scheduleRender();
+  });
+}
+
+
 const CONTROL_BUILDERS = {
   'slider':           buildSliderControl,
   'select':           buildSelectControl,
@@ -1149,6 +1205,7 @@ const CONTROL_BUILDERS = {
   'screen-chip':      buildScreenChip,
   'dotshape-chip':    buildDotShapeChip,
   'paper-chip':       buildPaperChip,
+  'duotone-color-chip': buildDuotoneColorChip,
   'angle-chip':       buildAngleChip,
 };
 
