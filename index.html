@@ -11,15 +11,23 @@
 <div id="header">
   <div class="title">HALFTONE</div>
   <div class="subtitle">PHOTOMECHANICAL PROCESS SIMULATOR</div>
-  <select id="preset-select">
-    <option value="">— SELECT PRESET —</option>
-    <option value="1963 NEWSPRINT">1963 NEWSPRINT</option>
-    <option value="1975 OFFSET ZINE">1975 OFFSET ZINE</option>
-    <option value="1985 MAGAZINE">1985 MAGAZINE</option>
-    <option value="VELOX STATS">VELOX STATS</option>
-    <option value="RISOGRAPH">RISOGRAPH</option>
-    <option value="CMYK CLEAN">CMYK CLEAN</option>
-  </select>
+  <div class="preset-wrap">
+    <button class="header-btn" id="btn-preset-open" onclick="togglePresetDropdown(event)">▾ PRESETS</button>
+    <div class="preset-dropdown" id="preset-dropdown">
+      <div class="pd-section-label">BUILT-IN</div>
+      <div id="pd-builtin"></div>
+      <div class="pd-section-label pd-custom-label" id="pd-custom-heading" style="display:none">CUSTOM</div>
+      <div id="pd-custom"></div>
+    </div>
+  </div>
+  <div class="preset-save-wrap" id="preset-save-wrap">
+    <button class="header-btn" id="btn-save-preset" onclick="startSavePreset()" title="Save current settings as a named preset">+ SAVE PRESET</button>
+    <div class="preset-name-input-wrap" id="preset-name-wrap" style="display:none">
+      <input type="text" id="preset-name-input" class="preset-name-input" placeholder="PRESET NAME" maxlength="32" autocomplete="off">
+      <button class="header-btn primary" onclick="confirmSavePreset()">SAVE</button>
+      <button class="header-btn" onclick="cancelSavePreset()">✕</button>
+    </div>
+  </div>
   <div id="render-status"></div>
   <button class="header-btn" id="btn-hq"     onclick="toggleHQ()"     title="Force 1:1 render resolution for live preview (Performance heavy)">[ ] HQ PREV</button>
   <button class="header-btn" id="btn-prev2x" onclick="togglePrev2x()" title="Force 2x render resolution for live preview">[ ] 2X PREV</button>

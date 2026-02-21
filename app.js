@@ -1259,25 +1259,6 @@ function loadImage(file) {
   img.src = url;
 }
 
-function applyPreset(name) {
-  const preset = PRESETS[name];
-  if (!preset) return;
-  state.activeModules = new Set(preset.active);
-  state.activeModules.add('halftone'); state.activeModules.add('press'); // always present
-
-  // Reset all params to defaults, then overlay preset values
-  for (const [id, def] of Object.entries(MODULE_DEFS)) {
-    state.moduleParams[id] = {};
-    for (const p of def.params) if (p.default !== undefined) state.moduleParams[id][p.id] = p.default;
-    if (def.extraDefaults) Object.assign(state.moduleParams[id], def.extraDefaults);
-  }
-  for (const [modId, modParams] of Object.entries(preset.params)) Object.assign(state.moduleParams[modId], modParams);
-
-  state.activePanel = null;
-  document.getElementById('module-panel').classList.remove('open');
-  buildPipelineStrip();
-  triggerRender();
-}
 
 function toggleExportDropdown(e) {
   e.stopPropagation();
@@ -1326,8 +1307,156 @@ function toggleLoupe() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// INIT
+// PRESET MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════
+
+const BUILTIN_PRESET_NAMES = Object.keys(PRESETS);
+
+// Load custom presets from localStorage
+let customPresets = {};
+try {
+  const saved = localStorage.getItem('halftone_custom_presets');
+  if (saved) customPresets = JSON.parse(saved);
+} catch(e) {}
+
+function persistCustomPresets() {
+  try { localStorage.setItem('halftone_custom_presets', JSON.stringify(customPresets)); } catch(e) {}
+}
+
+function buildPresetDropdown() {
+  const builtinEl  = document.getElementById('pd-builtin');
+  const customEl   = document.getElementById('pd-custom');
+  const customHead = document.getElementById('pd-custom-heading');
+  if (!builtinEl) return;
+
+  builtinEl.innerHTML = '';
+  customEl.innerHTML  = '';
+
+  // Built-in presets — no delete button
+  BUILTIN_PRESET_NAMES.forEach(name => {
+    const item = _makePresetItem(name, false);
+    builtinEl.appendChild(item);
+  });
+
+  // Custom presets
+  const customNames = Object.keys(customPresets);
+  customHead.style.display = customNames.length ? '' : 'none';
+  customNames.forEach(name => {
+    const item = _makePresetItem(name, true);
+    customEl.appendChild(item);
+  });
+}
+
+function _makePresetItem(name, deletable) {
+  const item = document.createElement('div');
+  item.className = 'pd-item';
+
+  const label = document.createElement('div');
+  label.className = 'pd-item-name';
+  label.textContent = name;
+  label.addEventListener('click', () => {
+    closePresetDropdown();
+    applyPreset(name);
+  });
+  item.appendChild(label);
+
+  if (deletable) {
+    const del = document.createElement('div');
+    del.className = 'pd-item-delete';
+    del.textContent = '×';
+    del.title = 'Delete preset';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteCustomPreset(name);
+    });
+    item.appendChild(del);
+  }
+
+  return item;
+}
+
+function togglePresetDropdown(e) {
+  e.stopPropagation();
+  document.getElementById('preset-dropdown').classList.toggle('open');
+}
+
+function closePresetDropdown() {
+  document.getElementById('preset-dropdown').classList.remove('open');
+}
+
+function deleteCustomPreset(name) {
+  delete customPresets[name];
+  persistCustomPresets();
+  buildPresetDropdown();
+}
+
+function startSavePreset() {
+  document.getElementById('btn-save-preset').style.display = 'none';
+  const wrap = document.getElementById('preset-name-wrap');
+  wrap.style.display = 'flex';
+  const input = document.getElementById('preset-name-input');
+  input.value = '';
+  input.focus();
+  input.addEventListener('keydown', _presetNameKeydown);
+}
+
+function _presetNameKeydown(e) {
+  if (e.key === 'Enter') confirmSavePreset();
+  if (e.key === 'Escape') cancelSavePreset();
+}
+
+function confirmSavePreset() {
+  const input = document.getElementById('preset-name-input');
+  const name  = input.value.trim().toUpperCase();
+  if (!name) { input.focus(); return; }
+
+  // Capture current state as a preset
+  const snapshot = {
+    active: Array.from(state.activeModules),
+    params: JSON.parse(JSON.stringify(state.moduleParams)),
+  };
+  customPresets[name] = snapshot;
+  persistCustomPresets();
+  buildPresetDropdown();
+  cancelSavePreset();
+
+  // Flash confirmation in render-status
+  const status = document.getElementById('render-status');
+  const prev = status.textContent;
+  status.textContent = `SAVED: ${name}`;
+  setTimeout(() => { status.textContent = prev; }, 2000);
+}
+
+function cancelSavePreset() {
+  const input = document.getElementById('preset-name-input');
+  input.removeEventListener('keydown', _presetNameKeydown);
+  document.getElementById('preset-name-wrap').style.display = 'none';
+  document.getElementById('btn-save-preset').style.display  = '';
+}
+
+// applyPreset now checks both PRESETS and customPresets
+function applyPreset(name) {
+  const preset = PRESETS[name] || customPresets[name];
+  if (!preset) return;
+  state.activeModules = new Set(preset.active);
+  state.activeModules.add('halftone'); state.activeModules.add('press');
+
+  for (const [id, def] of Object.entries(MODULE_DEFS)) {
+    state.moduleParams[id] = {};
+    for (const p of def.params) if (p.default !== undefined) state.moduleParams[id][p.id] = p.default;
+    if (def.extraDefaults) Object.assign(state.moduleParams[id], def.extraDefaults);
+  }
+  for (const [modId, modParams] of Object.entries(preset.params)) {
+    if (state.moduleParams[modId]) Object.assign(state.moduleParams[modId], modParams);
+  }
+
+  state.activePanel = null;
+  document.getElementById('module-panel').classList.remove('open');
+  buildPipelineStrip();
+  triggerRender();
+}
+
+
 
 document.addEventListener('DOMContentLoaded', () => {
   buildPipelineStrip();
@@ -1348,10 +1477,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (file && file.type.startsWith('image/')) loadImage(file);
   });
 
-  document.getElementById('preset-select').addEventListener('change', (e) => {
-    if (e.target.value) applyPreset(e.target.value);
-    e.target.value = '';
-  });
+  buildPresetDropdown();
 
   // Close any open dropdowns on outside click
   document.addEventListener('click', (e) => {
@@ -1359,6 +1485,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.add-dropdown.open').forEach(d => d.classList.remove('open'));
     }
     if (!e.target.closest('.export-wrap')) document.getElementById('export-dropdown').classList.remove('open');
+    if (!e.target.closest('.preset-wrap')) closePresetDropdown();
   });
 
   window.addEventListener('resize', () => { if (state.processedCanvas) drawSplit(); });

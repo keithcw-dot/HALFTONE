@@ -619,3 +619,49 @@ body {
   letter-spacing: 0.05em; cursor: pointer; transition: background 0.15s, color 0.15s; margin-top: 8px;
 }
 .export-dropdown .ed-btn:hover { background: var(--accent); color: #fff; }
+
+/* ─── PRESET DROPDOWN ─── */
+.preset-wrap { position: relative; }
+.preset-save-wrap { display: flex; align-items: center; gap: 8px; }
+
+.preset-dropdown {
+  position: absolute; top: calc(100% + 8px); left: 0; background: var(--surf2);
+  border: 1px solid var(--border2); z-index: 200; min-width: 220px;
+  display: none; flex-direction: column; padding: 8px 0;
+}
+.preset-dropdown.open { display: flex; }
+
+.pd-section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: var(--text-dim);
+  text-transform: uppercase; padding: 8px 14px 4px; border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.pd-section-label:first-child { border-top: none; margin-top: 0; }
+
+.pd-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; height: 34px; cursor: pointer; gap: 8px;
+  transition: background 0.1s;
+}
+.pd-item:hover { background: var(--surf3); }
+.pd-item-name {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.05em; color: var(--text);
+  text-transform: uppercase; flex: 1;
+}
+.pd-item:hover .pd-item-name { color: var(--accent-bright); }
+.pd-item-delete {
+  width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim); font-size: 14px; border-radius: 2px; flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+}
+.pd-item-delete:hover { background: var(--danger); color: #fff; }
+
+/* ─── PRESET SAVE INPUT ─── */
+.preset-name-input-wrap { display: flex; align-items: center; gap: 6px; }
+.preset-name-input {
+  height: 30px; padding: 0 10px; background: var(--surf2); border: 1px solid var(--border2);
+  color: var(--text-bright); font-family: inherit; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.05em; text-transform: uppercase; outline: none; width: 160px;
+}
+.preset-name-input:focus { border-color: var(--accent); }
+.preset-name-input::placeholder { color: var(--text-dim); font-weight: 400; text-transform: none; }
