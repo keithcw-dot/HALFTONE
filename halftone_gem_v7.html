@@ -1,0 +1,2528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HALFTONE</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d0b09;
+  --surf: #161310;
+  --surf2: #1e1b17;
+  --surf3: #262219;
+  --border: #2e2920;
+  --border2: #3d3628;
+  --accent: #c97d0a;
+  --accent-bright: #e8960f;
+  --accent-dim: #7a4a06;
+  --text: #b8b0a0;
+  --text-dim: #6b6357;
+  --text-bright: #d0c8b8;
+  --danger: #b03020;
+  --cyan-ink: #00a0d8;
+  --mag-ink: #d8006a;
+  --yel-ink: #d8c800;
+  --blk-ink: #1a1612;
+  --chip-h: 56px;
+  --strip-h: 90px;
+  --panel-h: 180px;
+  --header-h: 50px;
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  user-select: none;
+}
+
+/* ─── HEADER ─── */
+#header {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surf);
+  flex-shrink: 0;
+  z-index: 30;
+}
+
+#header .title {
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: 0.05em;
+  color: var(--accent-bright);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+#header .subtitle {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+#preset-select {
+  margin-left: auto;
+  background: var(--surf3);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  padding: 6px 12px;
+  cursor: pointer;
+  outline: none;
+  height: 32px;
+  min-width: 200px;
+  text-transform: uppercase;
+}
+
+#preset-select:hover { border-color: var(--accent-dim); }
+
+.header-btn {
+  height: 32px;
+  padding: 0 16px;
+  background: var(--surf3);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+
+.header-btn:hover { border-color: var(--accent); color: var(--accent-bright); }
+.header-btn.active { border-color: var(--accent); color: var(--accent-bright); background: var(--accent-dim); }
+.header-btn.primary {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-bright);
+}
+.header-btn.primary:hover { background: var(--accent); color: #fff; }
+
+#render-status {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  min-width: 80px;
+  text-align: right;
+  font-weight: 500;
+}
+
+/* ─── CANVAS AREA ─── */
+#canvas-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  min-height: 0;
+}
+
+#drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  border: 1px dashed var(--border2);
+  padding: 60px 80px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+#drop-zone:hover, #drop-zone.drag-over {
+  border-color: var(--accent-dim);
+}
+
+#drop-zone .drop-icon {
+  font-size: 40px;
+  line-height: 1;
+  opacity: 0.4;
+}
+
+#drop-zone .drop-label {
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+#drop-zone .drop-sub {
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+#canvas-container {
+  position: relative;
+  display: none;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#preview-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  image-rendering: pixelated;
+}
+
+#split-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255,255,255,0.5);
+  pointer-events: none;
+  z-index: 5;
+  display: none;
+}
+
+#split-line::before, #split-line::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255,255,255,0.6);
+  background: rgba(0,0,0,0.5);
+  border-radius: 50%;
+}
+
+#split-line::before { top: calc(50% - 30px); }
+#split-line::after  { top: calc(50% + 8px);  }
+
+/* ─── MODULE PANEL ─── */
+#module-panel {
+  height: 0;
+  overflow: hidden;
+  background: var(--surf);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  transition: height 0.2s ease;
+}
+
+#module-panel.open {
+  height: var(--panel-h);
+}
+
+#module-panel-inner {
+  padding: 14px 24px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+#module-panel-title {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-transform: uppercase;
+}
+
+#module-panel-title .group-tag {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--surf3);
+  padding: 3px 8px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.panel-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  margin-left: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+}
+
+#controls-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  flex: 1;
+}
+
+#controls-row::-webkit-scrollbar { height: 4px; }
+#controls-row::-webkit-scrollbar-track { background: var(--surf2); }
+#controls-row::-webkit-scrollbar-thumb { background: var(--border2); }
+
+/* ─── CONTROL WIDGETS ─── */
+.ctrl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.ctrl-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.ctrl-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  min-width: 75px;
+  text-transform: uppercase;
+}
+
+.ctrl-label.short { min-width: 40px; }
+
+.ctrl-value {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--accent-bright);
+  min-width: 46px;
+  text-align: right;
+  letter-spacing: 0.02em;
+}
+
+.ctrl-value.small { font-size: 12px; min-width: 36px; }
+
+/* Slider */
+.ctrl-slider {
+  width: 150px;
+  height: 18px;
+  -webkit-appearance: none;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ctrl-slider.wide { width: 190px; }
+.ctrl-slider.narrow { width: 110px; }
+
+.ctrl-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  background: var(--border2);
+  border-radius: 1px;
+}
+
+.ctrl-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: -5px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.ctrl-slider::-webkit-slider-thumb:hover { background: var(--accent-bright); }
+
+/* Select */
+.ctrl-select {
+  background: var(--surf3);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 12px;
+  padding: 5px 10px;
+  outline: none;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ctrl-select:hover { border-color: var(--accent-dim); }
+
+/* Toggle */
+.ctrl-toggle { display: flex; gap: 0; }
+.ctrl-toggle-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border2);
+  background: var(--surf3);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: all 0.1s;
+  margin-left: -1px;
+  text-transform: uppercase;
+}
+
+.ctrl-toggle-btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  z-index: 1;
+  position: relative;
+}
+
+/* Color swatch */
+.ctrl-color {
+  width: 36px;
+  height: 22px;
+  border: 1px solid var(--border2);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ctrl-color input[type="color"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── CUSTOM WRAPPERS ─── */
+.ctrl-custom-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+.ctrl-custom-label { font-weight: 700; font-size: 12px; letter-spacing: 0.05em; text-align: center; text-transform: uppercase; }
+
+/* ─── XY PAD CONTROL ─── */
+.ctrl-xypad { width: 90px; height: 90px; background: var(--surf3); border: 1px solid var(--border2); cursor: crosshair; position: relative; flex-shrink: 0; }
+.ctrl-xypad:hover { border-color: var(--border-lit, #555); }
+.ctrl-xypad:active { border-color: var(--accent-dim); }
+.ctrl-xypad-readout { font-family: monospace; font-size: 11px; color: var(--text-dim); letter-spacing: 0.02em; text-align: center; }
+
+/* ─── PRESS CHIP WIDGETS (pressure, feed, laydown, slur) ─── */
+.press-chip {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 10px; height: 204px;
+  background: var(--surf2); border: 1px solid var(--border);
+  padding: 12px 16px; border-radius: 8px;
+}
+.press-chip-row { display: flex; flex-direction: row; gap: 12px; align-items: center; }
+.press-svg-wrap {
+  height: 142px; flex-shrink: 0;
+  background: var(--surf); border-radius: 6px; border: 1px solid var(--border2); overflow: hidden;
+}
+.press-vslider-wrap { display: flex; align-items: center; justify-content: center; height: 142px; width: 20px; flex-shrink: 0; }
+.vert-slider {
+  -webkit-appearance: none; appearance: none; width: 120px; height: 4px;
+  background: var(--border2); transform: rotate(-90deg); border-radius: 2px; outline: none;
+}
+.vert-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--surf2);
+}
+.press-hslider {
+  -webkit-appearance: none; appearance: none; height: 4px;
+  background: var(--border2); border-radius: 2px; outline: none; cursor: pointer; flex-shrink: 0;
+}
+.press-hslider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--surf2);
+}
+.press-toggle-wrap { display: flex; border: 1px solid var(--border2); border-radius: 4px; overflow: hidden; }
+.press-toggle-btn {
+  flex: 1; height: 28px; background: transparent; border: none;
+  color: var(--text-dim); font-family: inherit; font-size: 11px;
+  font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+}
+.press-toggle-btn + .press-toggle-btn { border-left: 1px solid var(--border2); }
+.press-toggle-btn.active { background: var(--accent-dim); color: var(--accent); }
+.press-seq-label { font-size: 11px; letter-spacing: 0.08em; color: var(--accent); font-weight: 700; text-transform: uppercase; text-align: center; }
+.press-fstate { display: none; width: 100%; height: 100%; }
+.press-fstate.active { display: block; }
+@keyframes motion-swap-1 { 0%, 49.9% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes motion-swap-2 { 0%, 49.9% { opacity: 0; } 50%, 100% { opacity: 1; } }
+.motion-f1 { animation: motion-swap-1 0.3s infinite; }
+.motion-f2 { animation: motion-swap-2 0.3s infinite; }
+@keyframes press-fa-kf { 0%, 49.9% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes press-fb-kf { 0%, 49.9% { opacity: 0; } 50%, 100% { opacity: 1; } }
+@keyframes press-z1-kf { 0%, 49.9% { opacity: 0.7; } 50%, 100% { opacity: 0; } }
+@keyframes press-z2-kf { 0%, 49.9% { opacity: 0; } 50%, 100% { opacity: 0.7; } }
+.press-fa { animation: press-fa-kf 0.4s infinite; }
+.press-fb { animation: press-fb-kf 0.4s infinite; }
+.press-z1 { animation: press-z1-kf 0.25s infinite; }
+.press-z2 { animation: press-z2-kf 0.25s infinite; }
+
+/* ─── PIPELINE STRIP ─── */
+#pipeline-strip {
+  height: var(--strip-h);
+  display: flex;
+  align-items: center;
+  background: var(--surf);
+  border-top: 1px solid var(--border);
+  padding: 0 16px;
+  gap: 0;
+  overflow: visible;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 30;
+}
+
+#pipeline-strip::-webkit-scrollbar { height: 4px; }
+#pipeline-strip::-webkit-scrollbar-track { background: var(--surf2); }
+#pipeline-strip::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.pipeline-group { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.group-arrow { color: var(--text-dim); font-size: 18px; padding: 0 12px; opacity: 0.4; flex-shrink: 0; font-weight: bold; }
+.group-section { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.group-head { display: flex; align-items: center; gap: 10px; }
+.group-name { font-size: 12px; font-weight: 700; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
+
+.add-module-btn {
+  width: 24px; height: 24px; background: none; border: 1px solid var(--border2);
+  color: var(--text-dim); font-size: 18px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  position: relative; flex-shrink: 0; font-weight: bold;
+}
+.add-module-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.add-dropdown {
+  position: absolute; bottom: calc(100% + 6px); left: 0; background: var(--surf2);
+  border: 1px solid var(--border2); z-index: 100; min-width: 150px; display: none;
+}
+.add-dropdown.open { display: block; }
+.add-dropdown-item {
+  padding: 10px 14px; cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
+  color: var(--text); transition: background 0.1s; text-transform: uppercase;
+}
+.add-dropdown-item:hover { background: var(--surf3); color: var(--accent-bright); }
+
+.chips-row { display: flex; align-items: center; gap: 8px; }
+
+.module-chip {
+  height: var(--chip-h); display: flex; align-items: center; gap: 0;
+  background: var(--surf2); border: 1px solid var(--border); cursor: pointer;
+  transition: all 0.15s; position: relative; flex-shrink: 0;
+}
+.module-chip:hover { border-color: var(--border2); }
+.module-chip.active { background: var(--surf3); border-color: var(--accent-dim); }
+.module-chip.active .chip-label { color: var(--accent-bright); }
+
+.chip-label {
+  font-weight: 700; font-size: 14px; letter-spacing: 0.05em;
+  color: var(--text); padding: 0 16px; line-height: var(--chip-h); text-transform: uppercase;
+}
+
+.chip-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--accent-dim);
+  margin-right: 10px; margin-left: 8px; flex-shrink: 0;
+}
+
+.chip-remove {
+  width: 36px; height: var(--chip-h); display: flex; align-items: center; justify-content: center;
+  border-left: 1px solid var(--border); color: var(--text-dim); font-size: 18px; font-weight: bold;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.chip-remove:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+.chip-color-dots { display: flex; gap: 4px; padding: 0 12px 0 6px; }
+.chip-color-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+/* ─── PROCESSING OVERLAY ─── */
+#processing {
+  position: absolute; inset: 0; background: rgba(13,11,9,0.7); display: none;
+  align-items: center; justify-content: center; z-index: 20; flex-direction: column; gap: 8px;
+}
+#processing.visible { display: flex; }
+#processing .proc-text {
+  font-weight: 700; font-size: 24px; letter-spacing: 0.15em; color: var(--accent-bright); text-transform: uppercase;
+}
+
+/* ─── SPLIT DRAG HANDLE ─── */
+#canvas-area.has-image { cursor: col-resize; }
+#canvas-area.loupe-mode { cursor: crosshair; }
+
+/* ─── LOUPE ─── */
+#loupe {
+  position: absolute; width: 220px; height: 220px; border: 1px solid var(--accent-dim);
+  background: var(--bg); z-index: 25; pointer-events: none; display: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6); overflow: hidden;
+}
+#loupe.visible { display: block; }
+#loupe canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+#loupe-label {
+  position: absolute; bottom: 0; left: 0; right: 0; background: rgba(13,11,9,0.8);
+  font-family: monospace; font-size: 12px; font-weight: bold; color: var(--accent);
+  letter-spacing: 0.05em; padding: 6px 10px; text-align: center;
+}
+
+/* ─── EXPORT DROPDOWN ─── */
+.export-wrap { position: relative; }
+.export-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0; background: var(--surf2);
+  border: 1px solid var(--border2); z-index: 100; min-width: 240px; padding: 14px 16px;
+  display: none; flex-direction: column; gap: 12px;
+}
+.export-dropdown.open { display: flex; }
+.export-dropdown .ed-title {
+  font-weight: 700; font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px;
+}
+.export-dropdown .ed-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.export-dropdown .ed-label { font-size: 12px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase;}
+.export-dropdown .ed-value { font-family: monospace; font-size: 13px; color: var(--accent-bright); letter-spacing: 0.02em; }
+.export-dropdown .ed-select {
+  background: var(--surf3); border: 1px solid var(--border2); color: var(--text);
+  font-family: inherit; font-size: 12px; font-weight: 600; padding: 5px 10px; outline: none; cursor: pointer;
+}
+.export-dropdown .ed-select:hover { border-color: var(--accent-dim); }
+.export-dropdown .ed-btn {
+  height: 36px; padding: 0 20px; background: var(--accent-dim); border: 1px solid var(--accent);
+  color: var(--accent-bright); font-family: inherit; font-weight: 700; font-size: 15px; text-transform: uppercase;
+  letter-spacing: 0.05em; cursor: pointer; transition: background 0.15s, color 0.15s; margin-top: 8px;
+}
+.export-dropdown .ed-btn:hover { background: var(--accent); color: #fff; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="title">HALFTONE</div>
+  <div class="subtitle">PHOTOMECHANICAL PROCESS SIMULATOR</div>
+  <select id="preset-select">
+    <option value="">— SELECT PRESET —</option>
+    <option value="1963 NEWSPRINT">1963 NEWSPRINT</option>
+    <option value="1975 OFFSET ZINE">1975 OFFSET ZINE</option>
+    <option value="1985 MAGAZINE">1985 MAGAZINE</option>
+    <option value="VELOX STATS">VELOX STATS</option>
+    <option value="RISOGRAPH">RISOGRAPH</option>
+    <option value="CMYK CLEAN">CMYK CLEAN</option>
+  </select>
+  <div id="render-status"></div>
+  <button class="header-btn" id="btn-hq" onclick="toggleHQ()" title="Force 1:1 render resolution for live preview (Performance heavy)">[ ] HQ PREV</button>
+  <button class="header-btn" id="btn-prev2x" onclick="togglePrev2x()" title="Force 2x render resolution for live preview">[ ] 2X PREV</button>
+  <button class="header-btn" id="btn-loupe" onclick="toggleLoupe()" title="Toggle 200% pixel loupe — click and drag on preview to inspect full resolution">⊙ LOUPE 2X</button>
+  <div class="export-wrap">
+    <button class="header-btn primary" id="btn-export" onclick="toggleExportDropdown(event)">↓ EXPORT</button>
+    <div class="export-dropdown" id="export-dropdown">
+      <div class="ed-title">EXPORT OPTIONS</div>
+      <div class="ed-row">
+        <span class="ed-label">INPUT UPSCALE</span>
+        <select class="ed-select" id="export-upscale" onchange="state.exportUpscale = +this.value; updateExportSize();">
+          <option value="1">1× (native)</option>
+          <option value="2">2×</option>
+          <option value="3">3×</option>
+          <option value="4">4×</option>
+        </select>
+      </div>
+      <div class="ed-row">
+        <span class="ed-label">OUTPUT SIZE</span>
+        <span class="ed-value" id="export-size-label">—</span>
+      </div>
+      <button class="ed-btn" onclick="exportImage()">↓ EXPORT PNG</button>
+    </div>
+  </div>
+</div>
+
+<div id="canvas-area">
+  <div id="drop-zone">
+    <div class="drop-icon">◉</div>
+    <div class="drop-label">DROP IMAGE HERE</div>
+    <div class="drop-sub">OR CLICK TO BROWSE — JPG, PNG, WEBP</div>
+  </div>
+  <div id="canvas-container">
+    <canvas id="preview-canvas"></canvas>
+    <div id="split-line"></div>
+    <div id="loupe"><canvas id="loupe-canvas" width="220" height="220"></canvas><div id="loupe-label">200%</div></div>
+  </div>
+  <div id="processing"><div class="proc-text">PROCESSING…</div></div>
+</div>
+
+<div id="module-panel">
+  <div id="module-panel-inner">
+    <div id="module-panel-title">
+      <span id="panel-module-name">HALFTONE</span>
+      <span id="panel-group-tag" class="group-tag">SCREEN</span>
+      <span id="panel-desc" class="panel-desc"></span>
+    </div>
+    <div id="controls-row"></div>
+  </div>
+</div>
+
+<div id="pipeline-strip">
+  <!-- built by JS -->
+</div>
+
+<input type="file" id="file-input" accept="image/*" style="display:none">
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- INLINE WEB WORKER SCRIPT                                        -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<script id="worker-script" type="javascript/worker">
+  // Pre-computed universal Luminance multipliers mapped 0-255
+  const LUM_R = new Float32Array(256);
+  const LUM_G = new Float32Array(256);
+  const LUM_B = new Float32Array(256);
+  for(let i = 0; i < 256; i++) {
+    LUM_R[i] = i * 0.299;
+    LUM_G[i] = i * 0.587;
+    LUM_B[i] = i * 0.114;
+  }
+
+  const FILM_STOCKS = {
+    trix: {
+      name: 'TRI-X 400', bw: true,
+      curves: { r: { black: 0.02, shadows: 0.14, midtone: 0.52, highlights: 0.85, white: 0.98 }, g: { black: 0.02, shadows: 0.14, midtone: 0.52, highlights: 0.85, white: 0.98 }, b: { black: 0.02, shadows: 0.14, midtone: 0.52, highlights: 0.85, white: 0.98 } },
+      saturation: 0, bwWeights: [0.35, 0.50, 0.15], halation: { radius: 4, tint: [200, 200, 200], strength: 0.06 },
+    },
+    hp5: {
+      name: 'HP5 PLUS 400', bw: true,
+      curves: { r: { black: 0.03, shadows: 0.19, midtone: 0.50, highlights: 0.80, white: 0.96 }, g: { black: 0.03, shadows: 0.19, midtone: 0.50, highlights: 0.80, white: 0.96 }, b: { black: 0.03, shadows: 0.19, midtone: 0.50, highlights: 0.80, white: 0.96 } },
+      saturation: 0, bwWeights: [0.30, 0.55, 0.15], halation: { radius: 4, tint: [200, 200, 200], strength: 0.04 },
+    },
+    kodachrome: {
+      name: 'KODACHROME 64', bw: false,
+      curves: { r: { black: 0.03, shadows: 0.22, midtone: 0.55, highlights: 0.83, white: 0.97 }, g: { black: 0.02, shadows: 0.17, midtone: 0.48, highlights: 0.78, white: 0.95 }, b: { black: 0.01, shadows: 0.12, midtone: 0.40, highlights: 0.72, white: 0.92 } },
+      saturation: 1.35, halation: { radius: 8, tint: [255, 160, 80], strength: 0.15 },
+    },
+    portra: {
+      name: 'PORTRA 400', bw: false,
+      curves: { r: { black: 0.06, shadows: 0.24, midtone: 0.52, highlights: 0.78, white: 0.94 }, g: { black: 0.05, shadows: 0.22, midtone: 0.50, highlights: 0.76, white: 0.93 }, b: { black: 0.04, shadows: 0.19, midtone: 0.46, highlights: 0.73, white: 0.91 } },
+      saturation: 0.88, halation: { radius: 10, tint: [255, 190, 130], strength: 0.12 },
+    },
+    ektachrome: {
+      name: 'EKTACHROME 100', bw: false,
+      curves: { r: { black: 0.02, shadows: 0.19, midtone: 0.50, highlights: 0.80, white: 0.96 }, g: { black: 0.02, shadows: 0.20, midtone: 0.52, highlights: 0.82, white: 0.97 }, b: { black: 0.03, shadows: 0.22, midtone: 0.53, highlights: 0.82, white: 0.97 } },
+      saturation: 1.15, halation: { radius: 6, tint: [240, 180, 110], strength: 0.08 },
+    },
+  };
+
+  function copyCanvas(src) {
+    const dst = new OffscreenCanvas(src.width, src.height);
+    dst.getContext('2d').drawImage(src, 0, 0);
+    return dst;
+  }
+
+  function getPreviewCanvas(sourceCanvas, maxPx) {
+    const w = sourceCanvas.width, h = sourceCanvas.height;
+    const maxDim = Math.max(w, h);
+    if (maxDim <= maxPx) return copyCanvas(sourceCanvas);
+    const scale = maxPx / maxDim;
+    const dst = new OffscreenCanvas(Math.round(w * scale), Math.round(h * scale));
+    const ctx = dst.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(sourceCanvas, 0, 0, dst.width, dst.height);
+    return dst;
+  }
+
+  function applyUpscale(canvas, params) {
+    const scale = Math.round(params.scale);
+    if (scale <= 1) return canvas;
+    const dst = new OffscreenCanvas(canvas.width * scale, canvas.height * scale);
+    const ctx = dst.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(canvas, 0, 0, dst.width, dst.height);
+    return dst;
+  }
+
+  // Pre-bakes Exposure into the LUT to save an entire array loop later
+  function buildCurveLUT(curve, exposure) {
+    const lut = new Uint8Array(256);
+    const pts = [{ x: 0, y: curve.black }, { x: 0.25, y: curve.shadows }, { x: 0.5, y: curve.midtone }, { x: 0.75, y: curve.highlights }, { x: 1.0, y: curve.white }];
+    for (let i = 0; i < 256; i++) {
+      // Exposure shift calculated prior to curve mapping
+      const expVal = Math.max(0, Math.min(255, i * exposure));
+      const x = expVal / 255; 
+      let s = 0;
+      for (let j = 0; j < pts.length - 1; j++) { if (x <= pts[j + 1].x) { s = j; break; } if (j === pts.length - 2) s = j; }
+      const p0 = pts[s], p1 = pts[s + 1];
+      let t = p1.x > p0.x ? (x - p0.x) / (p1.x - p0.x) : 0;
+      t = t * t * (3 - 2 * t);
+      // Uint8Array implicitly handles the clamping/rounding, but we ensure positive range explicitly
+      lut[i] = Math.max(0, Math.min(255, Math.round((p0.y + t * (p1.y - p0.y)) * 255)));
+    }
+    return lut;
+  }
+
+  function boxBlur2D(data, w, h, radius) {
+    let src = new Float32Array(data);
+    let tmp = new Float32Array(w * h);
+    const r = Math.round(radius);
+    if (r < 1) return src;
+    for (let pass = 0; pass < 2; pass++) {
+      for (let y = 0; y < h; y++) {
+        let sum = 0, count = 0;
+        for (let bx = 0; bx <= r && bx < w; bx++) { sum += src[y * w + bx]; count++; }
+        tmp[y * w] = sum / count;
+        for (let x = 1; x < w; x++) {
+          if (x + r < w) { sum += src[y * w + x + r]; count++; }
+          if (x - r - 1 >= 0) { sum -= src[y * w + x - r - 1]; count--; }
+          tmp[y * w + x] = sum / count;
+        }
+      }
+      for (let x = 0; x < w; x++) {
+        let sum = 0, count = 0;
+        for (let by = 0; by <= r && by < h; by++) { sum += tmp[by * w + x]; count++; }
+        src[x] = sum / count;
+        for (let y = 1; y < h; y++) {
+          if (y + r < h) { sum += tmp[(y + r) * w + x]; count++; }
+          if (y - r - 1 >= 0) { sum -= tmp[(y - r - 1) * w + x]; count--; }
+          src[y * w + x] = sum / count;
+        }
+      }
+    }
+    return src;
+  }
+
+  function applyFilmStock(canvas, params) {
+    const stock = FILM_STOCKS[params.stock];
+    if (!stock) return canvas;
+    const dst = copyCanvas(canvas);
+    const ctx = dst.getContext('2d');
+    const imgData = ctx.getImageData(0, 0, dst.width, dst.height);
+    const d = imgData.data; // Note: Uint8ClampedArray handles out-of-bounds auto-clamping
+    const w = dst.width, h = dst.height;
+    
+    const exposure = Math.pow(2, params.exposure);
+    const halMul = params.halation;
+    const halStrength = halMul * stock.halation.strength;
+    const fade = params.fade;
+    
+    const lutR = buildCurveLUT(stock.curves.r, exposure);
+    const lutG = buildCurveLUT(stock.curves.g, exposure);
+    const lutB = buildCurveLUT(stock.curves.b, exposure);
+
+    if (halStrength > 0.005) {
+      const tint = stock.halation.tint;
+      const radius = stock.halation.radius;
+      const threshold = 0.65;
+      const bright = new Float32Array(w * h);
+      
+      for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+        const lum = (LUM_R[d[i]] + LUM_G[d[i+1]] + LUM_B[d[i+2]]) / 255;
+        bright[j] = lum > threshold ? (lum - threshold) / (1 - threshold) : 0;
+      }
+      const glow = boxBlur2D(bright, w, h, radius);
+      for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+        const g = glow[j] * halStrength;
+        if (g > 0.001) {
+          d[i]   += g * tint[0];
+          d[i+1] += g * tint[1];
+          d[i+2] += g * tint[2];
+        }
+      }
+    }
+
+    // Applies exposure mapping AND contrast curves in a single pass via LUT
+    for (let i = 0; i < d.length; i += 4) {
+      d[i]   = lutR[d[i]];
+      d[i+1] = lutG[d[i+1]];
+      d[i+2] = lutB[d[i+2]];
+    }
+
+    if (stock.bw && stock.bwWeights) {
+      const [wr, wg, wb] = stock.bwWeights;
+      const BW_R = new Float32Array(256), BW_G = new Float32Array(256), BW_B = new Float32Array(256);
+      for(let i=0; i<256; i++) { BW_R[i] = i * wr; BW_G[i] = i * wg; BW_B[i] = i * wb; }
+      
+      for (let i = 0; i < d.length; i += 4) {
+        const lum = BW_R[d[i]] + BW_G[d[i+1]] + BW_B[d[i+2]];
+        d[i] = d[i+1] = d[i+2] = lum;
+      }
+    }
+
+    if (!stock.bw && stock.saturation !== 1) {
+      const sat = stock.saturation;
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i+1], b = d[i+2];
+        const lum = LUM_R[r] + LUM_G[g] + LUM_B[b];
+        d[i]   = lum + (r - lum) * sat;
+        d[i+1] = lum + (g - lum) * sat;
+        d[i+2] = lum + (b - lum) * sat;
+      }
+    }
+
+    if (fade > 0.01) {
+      const rScale = stock.bw ? 1 : 1 + fade * 0.14;
+      const gScale = stock.bw ? 1 : 1 + fade * 0.03;
+      const bScale = stock.bw ? 1 : 1 - fade * 0.08;
+      const contrast = 1 - fade * 0.22;
+      const lift = fade * 0.07;
+      const desat = fade * 0.35;
+
+      // Pre-compute fade matrix math into 1D LUT arrays (mapping 0-255 into 0.0-1.0 range)
+      const FADE_R = new Float32Array(256);
+      const FADE_G = new Float32Array(256);
+      const FADE_B = new Float32Array(256);
+      for(let i=0; i<256; i++) {
+          FADE_R[i] = lift + (i / 255) * rScale * contrast;
+          FADE_G[i] = lift + (i / 255) * gScale * contrast;
+          FADE_B[i] = lift + (i / 255) * bScale * contrast;
+      }
+
+      for (let i = 0; i < d.length; i += 4) {
+        const r = FADE_R[d[i]], g = FADE_G[d[i+1]], b = FADE_B[d[i+2]];
+        const lum = r * 0.299 + g * 0.587 + b * 0.114;
+        d[i]   = (r + (lum - r) * desat) * 255;
+        d[i+1] = (g + (lum - g) * desat) * 255;
+        d[i+2] = (b + (lum - b) * desat) * 255;
+      }
+    }
+    
+    ctx.putImageData(imgData, 0, 0);
+    return dst;
+  }
+
+  function applyVelox(canvas, params) {
+    const dst = copyCanvas(canvas);
+    const ctx = dst.getContext('2d');
+    const id = ctx.getImageData(0, 0, dst.width, dst.height);
+    const d = id.data;
+    const t = params.threshold;
+    const c = params.contrast;
+
+    // Pre-calculate the heavy Math.exp operation into a Sigmoid LUT
+    const veloxLUT = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) {
+      let l = i / 255;
+      l = 1 / (1 + Math.exp(-(l - t) * c * 10));
+      veloxLUT[i] = Math.max(0, Math.min(255, Math.round(l * 255)));
+    }
+
+    for (let i = 0; i < d.length; i += 4) {
+      const lumInt = Math.round(LUM_R[d[i]] + LUM_G[d[i+1]] + LUM_B[d[i+2]]);
+      const v = veloxLUT[lumInt];
+      d[i] = d[i+1] = d[i+2] = v;
+    }
+    ctx.putImageData(id, 0, 0);
+    return dst;
+  }
+
+  function applyGrain(canvas, params) {
+    const dst = copyCanvas(canvas);
+    const ctx = dst.getContext('2d');
+    const id = ctx.getImageData(0, 0, dst.width, dst.height);
+    const d = id.data;
+    const amt = params.amount;
+    const weighted = params.weighted === 'on';
+    const noiseMax = 2 * amt * 255;
+
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = LUM_R[d[i]] + LUM_G[d[i+1]] + LUM_B[d[i+2]];
+      const weight = weighted ? (1 - lum / 255) * 1.5 : 1;
+      const noise = (Math.random() - 0.5) * noiseMax * weight;
+      d[i]   += noise;
+      d[i+1] += noise;
+      d[i+2] += noise;
+    }
+    ctx.putImageData(id, 0, 0);
+    return dst;
+  }
+
+  function buildInkSkipMap(w, h, intensity, scale, seedOffset, feedDir) {
+    const map = new Float32Array(w * h);
+    const blobCount = Math.max(3, Math.round((1 - scale) * 12 + 3));
+    const adjustedBlobCount = blobCount * 3; 
+    const baseRadius = scale * Math.min(w, h) * 0.6;
+    const blobs = [];
+    
+    const random = (seed) => {
+      let t = seed += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+
+    let seed = seedOffset * 1000;
+
+    for (let i = 0; i < adjustedBlobCount; i++) {
+      const rX = feedDir === 'vertical' ? baseRadius * 0.15 : baseRadius * 2.5;
+      const rY = feedDir === 'vertical' ? baseRadius * 2.5 : baseRadius * 0.15;
+      blobs.push({
+        x: random(seed++) * w, y: random(seed++) * h,
+        rx: rX * (0.5 + random(seed++)),
+        ry: rY * (0.5 + random(seed++)),
+        v: (random(seed++) - 0.5) * 2 * intensity,
+      });
+    }
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let sum = 0, wsum = 0;
+        for (const b of blobs) {
+          const dx = x - b.x;
+          const dy = y - b.y;
+          const dist = Math.sqrt((dx*dx)/(b.rx*b.rx) + (dy*dy)/(b.ry*b.ry));
+          if (dist < 1) {
+            const w2 = 1 - dist;
+            sum += b.v * w2; wsum += w2;
+          }
+        }
+        if (wsum > 0) {
+            const v = sum / wsum;
+            map[y * w + x] = Math.max(-intensity, Math.min(intensity, v));
+        } else {
+            map[y * w + x] = 0;
+        }
+      }
+    }
+    return map;
+  }
+
+  function buildPaperMap(w, h, texture, fibers, feedDir) {
+    const map = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        map[y * w + x] = (Math.random() - 0.5) * 2 * texture;
+      }
+    }
+    if (fibers > 0) {
+      const fiberCount = Math.round(Math.max(w, h) * fibers * 0.3);
+      for (let f = 0; f < fiberCount; f++) {
+        const fy = Math.floor(Math.random() * h);
+        const fx = Math.floor(Math.random() * w);
+        const fLen = Math.floor(Math.random() * Math.max(w,h) * 0.2) + 10;
+        const fVal = (Math.random() - 0.5) * fibers * 2;
+        if (feedDir === 'horizontal') {
+          for (let dx = 0; dx < fLen && fx + dx < w; dx++) {
+            const falloff = 1 - dx / fLen;
+            map[fy * w + fx + dx] += fVal * falloff;
+          }
+        } else {
+          for (let dy = 0; dy < fLen && fy + dy < h; dy++) {
+            const falloff = 1 - dy / fLen;
+            map[(fy + dy) * w + fx] += fVal * falloff;
+          }
+        }
+      }
+    }
+    return map;
+  }
+
+  function parseCSSColor(hex) {
+    const c = hex.replace('#', '');
+    return [ parseInt(c.substring(0, 2), 16), parseInt(c.substring(2, 4), 16), parseInt(c.substring(4, 6), 16) ];
+  }
+
+  function applyPlateHickeys(ctx, w, h, params, inkColorHex, plateIndex) {
+    const count = Math.round(params.count);
+    const sizeMax = params.sizeMax;
+    if (count < 1 || sizeMax < 2) return;
+    
+    const inkRGB = parseCSSColor(inkColorHex);
+    const darken = 0.6;
+    const ringR = Math.max(0, Math.min(255, Math.round(inkRGB[0] * darken)));
+    const ringG = Math.max(0, Math.min(255, Math.round(inkRGB[1] * darken)));
+    const ringB = Math.max(0, Math.min(255, Math.round(inkRGB[2] * darken)));
+
+    const random = (seed) => {
+      let t = seed += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+    let seed = plateIndex * 5000;
+
+    for (let i = 0; i < count; i++) {
+      const x = random(seed++) * w; 
+      const y = random(seed++) * h;
+      const outerR = 2 + random(seed++) * (sizeMax - 2);
+      const innerR = outerR * (0.35 + random(seed++) * 0.25);
+      
+      ctx.beginPath(); ctx.arc(x, y, outerR, 0, Math.PI * 2);
+      ctx.fillStyle = `rgb(${ringR},${ringG},${ringB})`; ctx.fill();
+      
+      ctx.beginPath(); ctx.arc(x, y, innerR, 0, Math.PI * 2);
+      ctx.fillStyle = `#ffffff`; ctx.fill();
+    }
+  }
+
+  function renderPlate(srcData, w, h, opts) {
+    const plate = new OffscreenCanvas(w, h);
+    const pCtx = plate.getContext('2d');
+    
+    pCtx.fillStyle = '#ffffff';
+    pCtx.fillRect(0, 0, w, h);
+
+    const { color, angleDeg, offsetX, offsetY, dotGain, shadowFill, dotShape, cellSize, getValue, inkSkipMap, fanout, feedDir, slur, plateIndex } = opts;
+    const cx = w / 2, cy = h / 2;
+    const rad = angleDeg * Math.PI / 180;
+    const cosA = Math.cos(rad), sinA = Math.sin(rad);
+
+    pCtx.fillStyle = color;
+
+    // Lateral expansion matrix for Fan-Out
+    const maxStretch = (fanout || 0) * ((plateIndex - 1) / 3);
+    const stretchFactorX = feedDir === 'vertical' ? maxStretch / (w / 2) : 0;
+    const stretchFactorY = feedDir === 'horizontal' ? maxStretch / (h / 2) : 0;
+
+    // Slur scaling matrix
+    const scaleX = feedDir === 'horizontal' ? 1 + (slur || 0) : 1;
+    const scaleY = feedDir === 'vertical' ? 1 + (slur || 0) : 1;
+
+    const halfDiag = Math.ceil(Math.sqrt(w * w + h * h) / 2) + cellSize;
+    for (let gy = -halfDiag; gy < halfDiag; gy += cellSize) {
+      for (let gx = -halfDiag; gx < halfDiag; gx += cellSize) {
+        const gcx = gx + cellSize * 0.5, gcy = gy + cellSize * 0.5;
+        const imgX = cx + gcx * cosA - gcy * sinA;
+        const imgY = cy + gcx * sinA + gcy * cosA;
+
+        if (imgX < 0 || imgX >= w || imgY < 0 || imgY >= h) continue;
+        const sx = Math.max(0, Math.min(w - 1, Math.round(imgX))), sy = Math.max(0, Math.min(h - 1, Math.round(imgY)));
+        const idx = (sy * w + sx) * 4;
+
+        let ink = Math.max(0, Math.min(1, getValue(srcData.data[idx], srcData.data[idx+1], srcData.data[idx+2])));
+        ink = ink + dotGain * ink * (1 - ink) * 2;
+        if (ink > 0.75 && shadowFill > 0) ink = ink + (1 - ink) * shadowFill * ((ink - 0.75) / 0.25);
+        ink = Math.max(0, Math.min(1, ink));
+
+        if (inkSkipMap) ink = Math.max(0, Math.min(1, ink * (1 - (inkSkipMap[sy * w + sx] || 0))));
+        const maxR = (cellSize * 0.5) * 0.98;
+        const radius = maxR * Math.sqrt(ink);
+        if (radius < 0.3) continue;
+
+        // Apply global offset PLUS additive lateral fan-out stretch
+        const dx = imgX + offsetX + ((imgX - cx) * stretchFactorX);
+        const dy = imgY + offsetY + ((imgY - cy) * stretchFactorY);
+
+        pCtx.save();
+        pCtx.translate(dx, dy);
+        if (slur > 0) pCtx.scale(scaleX, scaleY);
+        
+        pCtx.beginPath();
+        if (dotShape === 'diamond') {
+          pCtx.moveTo(0, -radius); pCtx.lineTo(radius, 0);
+          pCtx.lineTo(0, radius); pCtx.lineTo(-radius, 0);
+          pCtx.closePath();
+        } else if (dotShape === 'line') {
+          const lw = Math.max(0.3, Math.min(maxR, radius * 1.2));
+          pCtx.rotate(rad);
+          pCtx.rect(-cellSize * 0.5, -lw * 0.5, cellSize, lw);
+        } else {
+          pCtx.arc(0, 0, radius, 0, Math.PI * 2);
+        }
+        pCtx.fill();
+        pCtx.restore();
+      }
+    }
+
+    if (opts.hickeys) {
+      applyPlateHickeys(pCtx, w, h, opts.hickeys, color, plateIndex);
+    }
+
+    return plate;
+  }
+
+  function applyInkBleed(ctx, w, h, params, paperColor, feedDir) {
+    const radius = Math.round(params.radius);
+    if (radius < 1) return;
+    const absorbency = params.absorbency;
+    const dir = params.directionality || 0;
+    
+    // Bleed angle is strictly locked to paper grain orientation.
+    const ang = feedDir === 'vertical' ? Math.PI / 2 : 0;
+
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const src = new Uint8ClampedArray(imgData.data);
+    const dst = imgData.data;
+    const pc = parseCSSColor(paperColor);
+
+    const density = new Float32Array(w * h);
+    for (let i = 0, j = 0; i < src.length; i += 4, j++) {
+      const dr = (src[i] - pc[0]) / 255;
+      const dg = (src[i+1] - pc[1]) / 255;
+      const db = (src[i+2] - pc[2]) / 255;
+      const val = 1 - (1 + dr*0.299 + dg*0.587 + db*0.114);
+      density[j] = Math.max(0, Math.min(1, val));
+    }
+
+    const kernel = [];
+    let kSum = 0;
+    const cosA = Math.cos(ang), sinA = Math.sin(ang);
+    const stretch = Math.max(0.1, 1 - dir); 
+
+    for(let y = -radius; y <= radius; y++) {
+      for(let x = -radius; x <= radius; x++) {
+        const rx = x * cosA - y * sinA;
+        const ry = x * sinA + y * cosA;
+        const dist = Math.sqrt(rx*rx + (ry/stretch)*(ry/stretch));
+        if(dist <= radius) {
+          const weight = 1 - (dist / radius);
+          kernel.push({ dx: x, dy: y, w: weight });
+          kSum += weight;
+        }
+      }
+    }
+
+    const blurDensity = new Float32Array(w * h);
+    const blurR = new Float32Array(w * h);
+    const blurG = new Float32Array(w * h);
+    const blurB = new Float32Array(w * h);
+
+    for(let y = 0; y < h; y++) {
+      for(let x = 0; x < w; x++) {
+        let sD = 0, sR = 0, sG = 0, sB = 0;
+        for(let k = 0; k < kernel.length; k++) {
+          const px = Math.max(0, Math.min(w - 1, x + kernel[k].dx));
+          const py = Math.max(0, Math.min(h - 1, y + kernel[k].dy));
+          const i1D = py * w + px;
+          const i3D = i1D * 4;
+          const kw = kernel[k].w;
+          sD += density[i1D] * kw;
+          sR += src[i3D] * kw;
+          sG += src[i3D+1] * kw;
+          sB += src[i3D+2] * kw;
+        }
+        const outIdx = y * w + x;
+        blurDensity[outIdx] = sD / kSum;
+        blurR[outIdx] = sR / kSum;
+        blurG[outIdx] = sG / kSum;
+        blurB[outIdx] = sB / kSum;
+      }
+    }
+
+    // Pre-calculated square root lookup table for non-linear density scaling
+    const densityLUT = new Float32Array(1024);
+    for(let i=0; i<1024; i++) {
+        densityLUT[i] = Math.sqrt(i / 1023);
+    }
+
+    for (let i = 0, j = 0; i < dst.length; i += 4, j++) {
+      const idx = Math.min(1023, Math.max(0, blurDensity[j] * 1023)) | 0; // Bitwise OR truncation for speed
+      const densityCurve = densityLUT[idx];
+      const blend = Math.max(0, Math.min(1, densityCurve * absorbency * 1.5));
+      
+      dst[i]   = src[i]   + (blurR[j] - src[i])   * blend;
+      dst[i+1] = src[i+1] + (blurG[j] - src[i+1]) * blend;
+      dst[i+2] = src[i+2] + (blurB[j] - src[i+2]) * blend;
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  self.onmessage = async function(e) {
+    const { taskId, bitmap, activeModulesList, moduleParams, forExport, previewMaxPx, upscale } = e.data;
+    const active = new Set(activeModulesList);
+    const P = moduleParams;
+    const feedDir = P.press ? P.press.feed : 'vertical';
+
+    let sourceCanvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    sourceCanvas.getContext('2d').drawImage(bitmap, 0, 0);
+
+    let canvas = forExport ? sourceCanvas : getPreviewCanvas(sourceCanvas, previewMaxPx);
+
+    if (forExport && upscale > 1) {
+      canvas = applyUpscale(canvas, { scale: upscale });
+    }
+
+    if (active.has('filmstock')) canvas = applyFilmStock(canvas, P.filmstock);
+    if (active.has('velox')) canvas = applyVelox(canvas, P.velox);
+    if (active.has('grain')) canvas = applyGrain(canvas, P.grain);
+
+    const w = canvas.width, h = canvas.height;
+    const srcData = canvas.getContext('2d').getImageData(0, 0, w, h);
+
+    const ht = P.halftone;
+    const cellSize = ht.cellSize;
+    const mode = ht.mode;
+    const dotShape = ht.dotShape || 'circle';
+    const mAng = ht.masterAngle || 0;
+
+    const dg = active.has('dotgain') ? P.dotgain : { amount: 0, shadow: 0 };
+    const reg = active.has('registration') ? P.registration : { cx:0,cy:0,mx:0,my:0,yx:0,yy:0, fanout: 0 };
+    const hickeysConf = active.has('hickeys') ? P.hickeys : null;
+
+    const cmykGet = {
+      c: (r,g,b) => { const R=r/255,G=g/255,B=b/255,K=1-Math.max(R,G,B); return K>=1?0:(1-R-K)/(1-K); },
+      m: (r,g,b) => { const R=r/255,G=g/255,B=b/255,K=1-Math.max(R,G,B); return K>=1?0:(1-G-K)/(1-K); },
+      y: (r,g,b) => { const R=r/255,G=g/255,B=b/255,K=1-Math.max(R,G,B); return K>=1?0:(1-B-K)/(1-K); },
+      k: (r,g,b) => 1-Math.max(r/255,g/255,b/255),
+      lum: (r,g,b) => (LUM_R[r] + LUM_G[g] + LUM_B[b]) / 255,
+    };
+
+    let channels = [];
+    if (mode === 'bw') {
+      channels = [{ id: 'k', color: ht.duotoneColor1 || '#000000', angleDeg: ht.angleK + mAng, offsetX: 0, offsetY: 0, getValue: (r,g,b) => 1 - cmykGet.lum(r,g,b) }];
+    } else if (mode === 'duotone') {
+      channels = [
+        { id: '2', color: ht.duotoneColor2, angleDeg: ht.angleC + mAng, offsetX: reg.cx, offsetY: reg.cy, getValue: cmykGet.lum },
+        { id: '1', color: ht.duotoneColor1, angleDeg: ht.angleK + mAng, offsetX: 0, offsetY: 0, getValue: (r,g,b) => 1 - cmykGet.lum(r,g,b) },
+      ];
+    } else {
+      channels = [
+        { id: 'c', color: '#009fce', angleDeg: ht.angleC + mAng, offsetX: reg.cx, offsetY: reg.cy, getValue: cmykGet.c },
+        { id: 'm', color: '#d4006a', angleDeg: ht.angleM + mAng, offsetX: reg.mx, offsetY: reg.my, getValue: cmykGet.m },
+        { id: 'y', color: '#f5d800', angleDeg: ht.angleY + mAng, offsetX: reg.yx, offsetY: reg.yy, getValue: cmykGet.y },
+        { id: 'k', color: '#100c08', angleDeg: ht.angleK + mAng, offsetX: 0, offsetY: 0, getValue: cmykGet.k },
+      ];
+      
+      // Sort CMYK sequence dynamically based on laydown configuration
+      const laydown = P.press ? P.press.laydown : 'k-c-m-y';
+      const order = laydown.split('-');
+      channels.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    }
+
+    const out = new OffscreenCanvas(w, h);
+    const ctx = out.getContext('2d');
+    
+    ctx.fillStyle = ht.paperColor;
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalCompositeOperation = 'multiply';
+
+    channels.forEach((ch, index) => {
+      let inkSkipMap = null;
+      if (active.has('inkskip')) {
+        inkSkipMap = buildInkSkipMap(w, h, P.inkskip.intensity, P.inkskip.scale, index + 1, feedDir);
+      }
+      
+      const plate = renderPlate(srcData, w, h, { 
+        ...ch, 
+        dotGain: dg.amount, 
+        shadowFill: dg.shadow, 
+        dotShape, 
+        cellSize, 
+        inkSkipMap,
+        hickeys: hickeysConf,
+        fanout: reg.fanout,
+        feedDir: feedDir,
+        slur: P.press ? P.press.slur : 0,
+        plateIndex: index + 1
+      });
+      
+      ctx.drawImage(plate, 0, 0);
+    });
+    
+    ctx.globalCompositeOperation = 'source-over';
+
+    if (active.has('inkbleed')) applyInkBleed(ctx, w, h, P.inkbleed, ht.paperColor, feedDir);
+
+    if (active.has('paper')) {
+      const pp = P.paper;
+      const pressure = P.press ? P.press.pressure : 1.0;
+      const outData = ctx.getImageData(0, 0, w, h);
+      const od = outData.data;
+      const paperMap = buildPaperMap(w, h, pp.texture, pp.fibers, feedDir);
+      const pc = parseCSSColor(ht.paperColor);
+
+      for (let i = 0, j = 0; i < od.length; i += 4, j++) {
+        const lum = (LUM_R[od[i]] + LUM_G[od[i+1]] + LUM_B[od[i+2]]) / 255;
+        const pVal = paperMap[j];
+
+        if (lum > 0.4) {
+          const hw = Math.max(0, Math.min(1, (lum - 0.4) / 0.6));
+          const noise = pVal * hw * 150;
+          od[i]   += noise;
+          od[i+1] += noise;
+          od[i+2] += noise;
+        }
+
+        // Subtract ink in shadow regions when impression pressure is low to simulate mottling
+        if (pressure < 1.0 && lum < 0.6 && pVal > 0) {
+          const sw = Math.max(0, Math.min(1, (0.6 - lum) / 0.6));
+          const safeTexture = Math.max(0.001, pp.texture);
+          const mottleStrength = Math.max(0, Math.min(1, (1 - pressure) * (pVal / safeTexture) * sw * 2.0));
+          od[i]   += (pc[0] - od[i]) * mottleStrength;
+          od[i+1] += (pc[1] - od[i+1]) * mottleStrength;
+          od[i+2] += (pc[2] - od[i+2]) * mottleStrength;
+        }
+      }
+      ctx.putImageData(outData, 0, 0);
+    }
+
+    const outBmp = await createImageBitmap(out);
+    self.postMessage({ taskId, resultBitmap: outBmp }, [outBmp]);
+  };
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MAIN THREAD UI LOGIC                                            -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<script>
+const MODULE_DEFS = {
+  filmstock: {
+    id: 'filmstock', group: 'CAMERA', label: 'FILM STOCK', removable: true,
+    desc: 'Analog emulsion response — per-channel H&D curves, halation from light bouncing off the film base, and dye fade from aging.',
+    params: [
+      { id: 'stock', label: 'Stock', type: 'select', options: ['trix','hp5','kodachrome','portra','ektachrome'], labels: ['TRI-X 400','HP5 PLUS','KODACHROME 64','PORTRA 400','EKTACHROME 100'], default: 'kodachrome' },
+      { id: 'exposure', label: 'Exposure', type: 'slider', min: -2, max: 2, step: 0.1, default: 0, unit: 'EV' },
+      { id: 'halation', label: 'Halation', type: 'slider', min: 0, max: 1, step: 0.05, default: 0.5 },
+      { id: 'fade', label: 'Fade', type: 'slider', min: 0, max: 1, step: 0.05, default: 0 },
+    ]
+  },
+  velox: {
+    id: 'velox', group: 'PRE-SCREEN', label: 'VELOX', removable: true,
+    desc: 'High-contrast photographic paper used to make screened prints for paste-up. Sigmoid crush pushes tones toward black or white.',
+    params: [
+      { id: 'threshold', label: 'Threshold', type: 'slider', min: 0.1, max: 0.9, step: 0.01, default: 0.5 },
+      { id: 'contrast', label: 'Contrast', type: 'slider', min: 1.0, max: 3.0, step: 0.1, default: 1.5 },
+    ]
+  },
+  grain: {
+    id: 'grain', group: 'PRE-SCREEN', label: 'FILM GRAIN', removable: true,
+    desc: 'Silver halide clumping from the original film negative. Shadow weighting concentrates grain in dark areas.',
+    params: [
+      { id: 'amount', label: 'Amount', type: 'slider', min: 0, max: 0.5, step: 0.01, default: 0.12 },
+      { id: 'weighted', label: 'Shadow Weight', type: 'toggle', options: ['off','on'], default: 'on' },
+    ]
+  },
+  halftone: {
+    id: 'halftone', group: 'SCREEN', label: 'HALFTONE', removable: false,
+    desc: 'The core screening process. Continuous tones are broken into dots at a fixed grid angle.',
+    params: [
+      { id: 'mode', label: 'Mode', type: 'select', options: ['bw','duotone','cmyk'], labels: ['B&W','DUOTONE','CMYK'], default: 'cmyk' },
+      { id: 'cellSize', label: 'Screen', type: 'slider', min: 3, max: 24, step: 1, default: 10, unit: 'px', width: 'narrow' },
+      { id: 'dotShape', label: 'Dot Shape', type: 'select', options: ['circle','diamond','line'], labels: ['●','◆','▬'], default: 'circle' },
+      { id: 'paperColor', label: 'Paper', type: 'color', default: '#f0ead8' },
+      { id: 'masterAngle', label: 'Master Rotation', type: 'slider', min: 0, max: 179, step: 1, default: 0, unit: '°' },
+      { id: 'angleK', label: 'Angle K', type: 'slider', min: 0, max: 179, step: 1, default: 45, unit: '°', width: 'narrow' },
+      { id: 'angleC', label: 'Angle C', type: 'slider', min: 0, max: 179, step: 1, default: 15, unit: '°', width: 'narrow' },
+      { id: 'angleM', label: 'Angle M', type: 'slider', min: 0, max: 179, step: 1, default: 75, unit: '°', width: 'narrow' },
+      { id: 'angleY', label: 'Angle Y', type: 'slider', min: 0, max: 179, step: 1, default: 90, unit: '°', width: 'narrow' },
+      { id: 'duotoneColor1', label: 'Color 1', type: 'color', default: '#1a1008' },
+      { id: 'duotoneColor2', label: 'Color 2', type: 'color', default: '#d4890a' },
+    ]
+  },
+  press: {
+    id: 'press', group: 'PRINT', label: 'PRESS CONFIG', removable: false,
+    desc: 'Master mechanical links: FEED aligns Bleed/Skip/Fibers. PRESSURE dictates mottling (requires Paper module).',
+    params: [
+      { id: 'feed', label: 'Feed Direction', type: 'feed-chip', options: ['vertical', 'horizontal'], default: 'vertical', title: 'Locks the axis for Ink Bleed, Ink Skip banding, Paper Fibers, and Slur elongation.' },
+      { id: 'laydown', label: 'Ink Sequence', type: 'laydown-chip', options: ['k-c-m-y', 'y-m-c-k', 'c-m-y-k', 'm-c-y-k'], labels: ['K–C–M–Y', 'Y–M–C–K', 'C–M–Y–K', 'M–C–Y–K'], default: 'k-c-m-y', title: 'Physical laydown order. Determines which ink physically traps and obscures the layers beneath it.' },
+      { id: 'pressure', label: 'Pressure', type: 'pressure-roller', min: 0.1, max: 1.0, step: 0.05, default: 1.0, title: 'Reduces ink transfer in paper valleys (mottling). Requires Paper Texture > 0.' },
+      { id: 'slur', label: 'Slur Elongation', type: 'slur-chip', min: 0, max: 0.5, step: 0.01, default: 0, title: 'Elongates dots exclusively along the Feed Direction due to blanket slippage.' },
+    ]
+  },
+  dotgain: {
+    id: 'dotgain', group: 'PRINT', label: 'DOT GAIN', removable: true,
+    desc: 'Mechanical dot enlargement during impression. Midtones inflate non-linearly; shadow fill crushes deep blacks to solid.',
+    params: [
+      { id: 'amount', label: 'Gain', type: 'slider', min: 0, max: 1.0, step: 0.01, default: 0.25 },
+      { id: 'shadow', label: 'Shadow Fill', type: 'slider', min: 0, max: 1, step: 0.05, default: 0.3 },
+    ]
+  },
+  registration: {
+    id: 'registration', group: 'PRINT', label: 'REGISTRATION', removable: true,
+    desc: 'Channel misalignment and lateral web stretch. Pads shift plates globally. Fan-Out expands later plates orthogonally.',
+    params: [
+      { id: 'c_xy', label: 'CYAN', type: 'xypad', xId: 'cx', yId: 'cy', min: -15, max: 15, step: 0.5, color: '#00a0d8' },
+      { id: 'm_xy', label: 'MAGENTA', type: 'xypad', xId: 'mx', yId: 'my', min: -15, max: 15, step: 0.5, color: '#d8006a' },
+      { id: 'y_xy', label: 'YELLOW', type: 'xypad', xId: 'yx', yId: 'yy', min: -15, max: 15, step: 0.5, color: '#d8c800' },
+      { id: 'fanout', label: 'Fan-Out Stretch', type: 'slider', min: 0, max: 10, step: 0.1, default: 0, unit: 'px' },
+    ],
+    extraDefaults: { cx: 0, cy: 0, mx: 0, my: 0, yx: 0, yy: 0, fanout: 0 },
+  },
+  inkskip: {
+    id: 'inkskip', group: 'PRINT', label: 'INK SKIP', removable: true,
+    desc: 'Roller starvation applied per plate. Voids are stretched along the feed direction to form continuous bands.',
+    params: [
+      { id: 'intensity', label: 'Intensity', type: 'slider', min: 0, max: 1, step: 0.01, default: 0.3 },
+      { id: 'scale', label: 'Scale', type: 'slider', min: 0.05, max: 1, step: 0.01, default: 0.4 },
+    ]
+  },
+  paper: {
+    id: 'paper', group: 'PRINT', label: 'PAPER TOOTH', removable: true,
+    desc: 'Surface roughness of the paper stock. Cellulose streaks are structurally aligned to the feed direction.',
+    params: [
+      { id: 'texture', label: 'Texture', type: 'slider', min: 0, max: 0.5, step: 0.01, default: 0.15 },
+      { id: 'fibers', label: 'Fibers', type: 'slider', min: 0, max: 0.5, step: 0.01, default: 0.05 },
+    ]
+  },
+  inkbleed: {
+    id: 'inkbleed', group: 'PRINT', label: 'INK BLEED', removable: true,
+    desc: 'Ink wicking along paper fibers. Anisotropic settings cause ink to travel further along the structural grain.',
+    params: [
+      { id: 'radius', label: 'Radius', type: 'slider', min: 1, max: 16, step: 1, default: 3, unit: 'px', width: 'narrow' },
+      { id: 'absorbency', label: 'Absorbency', type: 'slider', min: 0, max: 1, step: 0.05, default: 0.8 },
+      { id: 'directionality', label: 'Directionality', type: 'slider', min: 0, max: 1, step: 0.05, default: 0.7 },
+    ]
+  },
+  hickeys: {
+    id: 'hickeys', group: 'PRINT', label: 'HICKEYS', removable: true,
+    desc: 'Donut-shaped defects applied to individual plates, allowing other channels to print in the void.',
+    params: [
+      { id: 'count', label: 'Count', type: 'slider', min: 1, max: 100, step: 1, default: 12, width: 'narrow' },
+      { id: 'sizeMax', label: 'Size', type: 'slider', min: 3, max: 30, step: 1, default: 8, unit: 'px', width: 'narrow' },
+    ]
+  },
+};
+
+const GROUP_ORDER = ['CAMERA', 'PRE-SCREEN', 'SCREEN', 'PRINT'];
+const GROUP_MODULES = {
+  'CAMERA': ['filmstock'],
+  'PRE-SCREEN': ['velox', 'grain'],
+  'SCREEN': ['halftone'],
+  'PRINT': ['press', 'dotgain', 'registration', 'inkskip', 'inkbleed', 'hickeys', 'paper'],
+};
+
+const PRESETS = {
+  '1963 NEWSPRINT': {
+    active: ['filmstock', 'velox', 'grain', 'halftone', 'press', 'dotgain', 'registration', 'inkbleed', 'hickeys', 'paper'],
+    params: {
+      filmstock: { stock: 'trix', exposure: 0.3, halation: 0.4, fade: 0.3 },
+      halftone: { mode: 'bw', cellSize: 14, masterAngle: 0, angleK: 45, dotShape: 'circle', paperColor: '#d6cdb4' },
+      velox: { threshold: 0.52, contrast: 2.0 }, grain: { amount: 0.12, weighted: 'on' },
+      press: { feed: 'vertical', laydown: 'k-c-m-y', pressure: 0.7, slur: 0.15 }, dotgain: { amount: 0.45, shadow: 0.4 }, 
+      inkbleed: { radius: 6.0, absorbency: 0.9, directionality: 0.7 },
+      registration: { cx: 0, cy: 0, mx: 0, my: 0, yx: 0, yy: 0, fanout: 2.0 },
+      hickeys: { count: 18, sizeMax: 14 }, paper: { texture: 0.35, fibers: 0.25 },
+    }
+  },
+  '1975 OFFSET ZINE': {
+    active: ['filmstock', 'grain', 'halftone', 'press', 'dotgain', 'registration', 'inkskip', 'inkbleed', 'hickeys', 'paper'],
+    params: {
+      filmstock: { stock: 'ektachrome', exposure: 0, halation: 0.5, fade: 0.15 },
+      halftone: { mode: 'cmyk', cellSize: 14, masterAngle: 0, angleK: 45, angleC: 15, angleM: 75, angleY: 90, dotShape: 'circle', paperColor: '#ede0c4' },
+      grain: { amount: 0.07, weighted: 'on' }, press: { feed: 'horizontal', laydown: 'y-m-c-k', pressure: 0.85, slur: 0.05 }, dotgain: { amount: 0.32, shadow: 0.3 },
+      registration: { cx: 2.5, cy: 1.0, mx: -0.5, my: 0.5, yx: -1.5, yy: -0.5, fanout: 1.5 },
+      inkskip: { intensity: 0.4, scale: 0.5 },
+      inkbleed: { radius: 3.0, absorbency: 0.65, directionality: 0.4 }, hickeys: { count: 25, sizeMax: 8 }, paper: { texture: 0.14, fibers: 0.15 },
+    }
+  },
+  '1985 MAGAZINE': {
+    active: ['filmstock', 'halftone', 'press', 'dotgain'],
+    params: {
+      filmstock: { stock: 'kodachrome', exposure: 0, halation: 0.4, fade: 0 },
+      halftone: { mode: 'cmyk', cellSize: 7, masterAngle: 0, angleK: 45, angleC: 15, angleM: 75, angleY: 90, dotShape: 'circle', paperColor: '#f8f5ef' },
+      press: { feed: 'vertical', laydown: 'k-c-m-y', pressure: 1.0, slur: 0 }, dotgain: { amount: 0.13, shadow: 0.1 },
+    }
+  },
+  'VELOX STATS': {
+    active: ['filmstock', 'velox', 'halftone', 'press', 'dotgain'],
+    params: {
+      filmstock: { stock: 'hp5', exposure: 0, halation: 0.2, fade: 0 },
+      halftone: { mode: 'bw', cellSize: 11, masterAngle: 0, angleK: 45, dotShape: 'circle', paperColor: '#f4efea' },
+      velox: { threshold: 0.47, contrast: 3.0 }, press: { feed: 'vertical', laydown: 'k-c-m-y', pressure: 1.0, slur: 0 }, dotgain: { amount: 0.18, shadow: 0.2 },
+    }
+  },
+  'RISOGRAPH': {
+    active: ['halftone', 'press', 'dotgain', 'registration', 'inkskip'],
+    params: {
+      halftone: { mode: 'duotone', cellSize: 11, masterAngle: 0, angleK: 55, angleC: 80, dotShape: 'circle', duotoneColor1: '#1e3a8a', duotoneColor2: '#e8402a', paperColor: '#f7f0e6' },
+      press: { feed: 'vertical', laydown: 'k-c-m-y', pressure: 0.9, slur: 0.08 }, dotgain: { amount: 0.2, shadow: 0.15 }, registration: { cx: 2.5, cy: -1.5, mx: 0, my: 0, yx: 0, yy: 0, fanout: 0 },
+      inkskip: { intensity: 0.3, scale: 0.2 },
+    }
+  },
+  'CMYK CLEAN': {
+    active: ['halftone', 'press'],
+    params: { halftone: { mode: 'cmyk', cellSize: 9, masterAngle: 0, angleK: 45, angleC: 15, angleM: 75, angleY: 90, dotShape: 'circle', paperColor: '#ffffff' }, press: { feed: 'vertical', laydown: 'k-c-m-y', pressure: 1.0, slur: 0 } }
+  },
+};
+
+const state = {
+  sourceImage: null, sourceCanvas: null, processedCanvas: null,
+  activeModules: new Set(['halftone', 'press']), moduleParams: {}, activePanel: null,
+  splitX: 0.5, draggingSplit: false, draggingLoupe: false, exportUpscale: 1,
+  hqPreview: false, prev2x: false, loupeActive: false, loupeFullRes: null, loupeDirty: true,
+  t0: 0
+};
+
+for (const [id, def] of Object.entries(MODULE_DEFS)) {
+  state.moduleParams[id] = {};
+  for (const p of def.params) if (p.default !== undefined) state.moduleParams[id][p.id] = p.default;
+  if (def.extraDefaults) Object.assign(state.moduleParams[id], def.extraDefaults);
+}
+
+function imageToCanvas(img) {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  return c;
+}
+
+// ─── INITIALIZE WORKER ──────────────────────────────────────────
+const workerBlob = new Blob([document.getElementById('worker-script').textContent], { type: 'application/javascript' });
+const renderWorker = new Worker(URL.createObjectURL(workerBlob));
+
+renderWorker.onmessage = function(e) {
+  const { taskId, resultBitmap } = e.data;
+  const canvas = document.createElement('canvas');
+  canvas.width = resultBitmap.width; canvas.height = resultBitmap.height;
+  canvas.getContext('2d').drawImage(resultBitmap, 0, 0);
+
+  if (taskId === 'preview') {
+    state.processedCanvas = canvas;
+    const t1 = performance.now();
+    document.getElementById('render-status').textContent = `${Math.round(t1 - state.t0)}ms`;
+    document.getElementById('processing').classList.remove('visible');
+    drawSplit();
+  } else if (taskId === 'loupe') {
+    state.loupeFullRes = canvas;
+    state.loupeDirty = false;
+    document.getElementById('render-status').textContent = 'LOUPE OK';
+    setTimeout(() => { document.getElementById('render-status').textContent = ''; }, 1200);
+  } else if (taskId === 'export') {
+    const link = document.createElement('a');
+    link.download = 'halftone_' + Date.now() + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    document.getElementById('render-status').textContent = 'EXPORTED';
+    document.getElementById('processing').classList.remove('visible');
+  }
+};
+
+let renderTimeout = null;
+
+function scheduleRender() {
+  if (!state.sourceImage) return;
+  clearTimeout(renderTimeout);
+  renderTimeout = setTimeout(triggerRender, 250);
+}
+
+function dispatchWorkerTask(taskId, opts = {}) {
+  if (!state.sourceCanvas) return;
+  createImageBitmap(state.sourceCanvas).then(bitmap => {
+    let previewMaxPx = 900;
+    if (state.hqPreview) previewMaxPx = 99999;
+    else if (state.prev2x) previewMaxPx = 1800;
+
+    renderWorker.postMessage({
+      taskId,
+      bitmap,
+      activeModulesList: Array.from(state.activeModules),
+      moduleParams: JSON.parse(JSON.stringify(state.moduleParams)),
+      previewMaxPx,
+      ...opts
+    }, [bitmap]);
+  });
+}
+
+function triggerRender() {
+  if (!state.sourceCanvas) return;
+  clearTimeout(renderTimeout);
+  state.loupeDirty = true;
+  state.t0 = performance.now();
+  document.getElementById('render-status').textContent = 'RENDERING…';
+  document.getElementById('processing').classList.add('visible');
+  dispatchWorkerTask('preview', { forExport: false, upscale: 1 });
+}
+
+function renderLoupeCache() {
+  if (!state.sourceCanvas) return;
+  document.getElementById('render-status').textContent = 'LOUPE…';
+  dispatchWorkerTask('loupe', { forExport: false, previewMaxPx: 99999, upscale: 1 });
+}
+
+function exportImage() {
+  if (!state.sourceCanvas) { alert('No image loaded.'); return; }
+  document.getElementById('export-dropdown').classList.remove('open');
+  document.getElementById('render-status').textContent = 'EXPORTING…';
+  document.getElementById('processing').classList.add('visible');
+  dispatchWorkerTask('export', { forExport: true, upscale: state.exportUpscale });
+}
+
+// ─── RENDERING DISPLAY ──────────────────────────────────────────
+function drawSplit() {
+  if (!state.sourceCanvas || !state.processedCanvas) return;
+
+  const src = state.sourceCanvas;
+  const proc = state.processedCanvas;
+  const area = document.getElementById('canvas-area');
+  const areaW = area.clientWidth;
+  const areaH = area.clientHeight;
+
+  const scaleW = areaW / src.width;
+  const scaleH = areaH / src.height;
+  const scale = Math.min(scaleW, scaleH, 1);
+  const dispW = Math.floor(src.width * scale);
+  const dispH = Math.floor(src.height * scale);
+
+  const preview = document.getElementById('preview-canvas');
+  preview.width = dispW;
+  preview.height = dispH;
+  preview.style.width = dispW + 'px';
+  preview.style.height = dispH + 'px';
+
+  const ctx = preview.getContext('2d');
+  ctx.clearRect(0, 0, dispW, dispH);
+
+  const splitPx = Math.round(state.splitX * dispW);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, splitPx, dispH);
+  ctx.clip();
+  ctx.drawImage(src, 0, 0, dispW, dispH);
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(splitPx, 0, dispW - splitPx, dispH);
+  ctx.clip();
+  ctx.drawImage(proc, 0, 0, dispW, dispH);
+  ctx.restore();
+
+  const splitLine = document.getElementById('split-line');
+  splitLine.style.display = 'block';
+  splitLine.style.left = (area.clientWidth / 2 - dispW / 2 + splitPx) + 'px';
+  splitLine.style.top = (area.clientHeight / 2 - dispH / 2) + 'px';
+  splitLine.style.height = dispH + 'px';
+}
+
+function buildPipelineStrip() {
+  const strip = document.getElementById('pipeline-strip');
+  strip.innerHTML = '';
+
+  GROUP_ORDER.forEach((groupName, gi) => {
+    if (gi > 0) {
+      const arrow = document.createElement('div');
+      arrow.className = 'group-arrow';
+      arrow.textContent = '›';
+      strip.appendChild(arrow);
+    }
+
+    const section = document.createElement('div');
+    section.className = 'group-section';
+
+    const head = document.createElement('div');
+    head.className = 'group-head';
+
+    const label = document.createElement('div');
+    label.className = 'group-name';
+    label.textContent = groupName;
+    head.appendChild(label);
+
+    const addable = GROUP_MODULES[groupName].filter(id => MODULE_DEFS[id].removable);
+    const notActive = addable.filter(id => !state.activeModules.has(id));
+
+    if (addable.length > 0) {
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-module-btn';
+      addBtn.textContent = '+';
+
+      const dropdown = document.createElement('div');
+      dropdown.className = 'add-dropdown';
+
+      if (notActive.length === 0) {
+        addBtn.style.opacity = '0.3';
+        addBtn.disabled = true;
+      } else {
+        notActive.forEach(id => {
+          const item = document.createElement('div');
+          item.className = 'add-dropdown-item';
+          item.textContent = MODULE_DEFS[id].label;
+          if (MODULE_DEFS[id].desc) item.title = MODULE_DEFS[id].desc;
+          item.addEventListener('click', () => {
+            state.activeModules.add(id);
+            dropdown.classList.remove('open');
+            buildPipelineStrip();
+            openPanel(id);
+            scheduleRender();
+          });
+          dropdown.appendChild(item);
+        });
+        addBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          dropdown.classList.toggle('open');
+        });
+      }
+      addBtn.appendChild(dropdown);
+      head.appendChild(addBtn);
+    }
+    section.appendChild(head);
+
+    const chips = document.createElement('div');
+    chips.className = 'chips-row';
+
+    GROUP_MODULES[groupName].forEach(id => {
+      if (!state.activeModules.has(id)) return;
+      const def = MODULE_DEFS[id];
+
+      const chip = document.createElement('div');
+      chip.className = 'module-chip' + (state.activePanel === id ? ' active' : '');
+      chip.dataset.id = id;
+      if (def.desc) chip.title = def.desc;
+
+      if (id === 'halftone') {
+        const mode = state.moduleParams.halftone.mode;
+        const dots = document.createElement('div');
+        dots.className = 'chip-color-dots';
+        if (mode === 'cmyk') {
+          [['var(--cyan-ink)'],['var(--mag-ink)'],['var(--yel-ink)'],['var(--blk-ink)']].forEach(([c]) => {
+            const d = document.createElement('div');
+            d.className = 'chip-color-dot';
+            d.style.background = c;
+            dots.appendChild(d);
+          });
+        } else if (mode === 'duotone') {
+          ['duotoneColor1','duotoneColor2'].forEach(k => {
+            const d = document.createElement('div');
+            d.className = 'chip-color-dot';
+            d.style.background = state.moduleParams.halftone[k];
+            dots.appendChild(d);
+          });
+        } else {
+          const d = document.createElement('div');
+          d.className = 'chip-color-dot';
+          d.style.background = state.moduleParams.halftone.duotoneColor1 || '#000';
+          dots.appendChild(d);
+        }
+        chip.appendChild(dots);
+      } else {
+        const dot = document.createElement('div');
+        dot.className = 'chip-dot';
+        chip.appendChild(dot);
+      }
+
+      const chipLabel = document.createElement('div');
+      chipLabel.className = 'chip-label';
+      chipLabel.textContent = def.label;
+      chip.appendChild(chipLabel);
+
+      if (def.removable) {
+        const rm = document.createElement('div');
+        rm.className = 'chip-remove';
+        rm.textContent = '×';
+        rm.addEventListener('click', (e) => {
+          e.stopPropagation();
+          state.activeModules.delete(id);
+          if (state.activePanel === id) closePanel();
+          buildPipelineStrip();
+          scheduleRender();
+        });
+        chip.appendChild(rm);
+      }
+
+      chip.addEventListener('click', () => {
+        if (state.activePanel === id) closePanel();
+        else openPanel(id);
+      });
+
+      chips.appendChild(chip);
+    });
+
+    section.appendChild(chips);
+    strip.appendChild(section);
+  });
+}
+
+function openPanel(moduleId) {
+  state.activePanel = moduleId;
+  const def = MODULE_DEFS[moduleId];
+  const panel = document.getElementById('module-panel');
+  document.getElementById('panel-module-name').textContent = def.label;
+  document.getElementById('panel-group-tag').textContent = def.group;
+  document.getElementById('panel-desc').textContent = def.desc || '';
+  const row = document.getElementById('controls-row');
+  row.innerHTML = '';
+  buildControls(row, moduleId);
+  panel.classList.add('open');
+  buildPipelineStrip();
+}
+
+function closePanel() {
+  state.activePanel = null;
+  document.getElementById('module-panel').classList.remove('open');
+  buildPipelineStrip();
+}
+
+function buildControls(container, moduleId) {
+  const def = MODULE_DEFS[moduleId];
+  const params = state.moduleParams[moduleId];
+
+  def.params.forEach(p => {
+    const ht = moduleId === 'halftone';
+    const mode = ht ? params.mode : null;
+
+    if (ht) {
+      if (mode === 'bw' && ['angleC','angleM','angleY','duotoneColor1','duotoneColor2'].includes(p.id)) return;
+      if (mode === 'duotone' && ['angleM','angleY'].includes(p.id)) return;
+      if (mode === 'cmyk' && ['duotoneColor1','duotoneColor2'].includes(p.id)) return;
+    }
+
+    const item = document.createElement('div');
+    item.className = 'ctrl-item';
+
+    const label = document.createElement('div');
+    label.className = 'ctrl-label' + (p.labelClass ? ' ' + p.labelClass : '');
+    label.textContent = p.label;
+    
+    if (p.title) {
+      label.title = p.title;
+      label.style.cursor = 'help';
+      label.style.borderBottom = '1px dotted var(--border2)';
+    }
+
+    item.appendChild(label);
+
+    if (p.type === 'slider') {
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.className = 'ctrl-slider' + (p.width ? ' ' + p.width : '');
+      slider.min = p.min; slider.max = p.max; slider.step = p.step;
+      slider.value = params[p.id];
+
+      const val = document.createElement('div');
+      val.className = 'ctrl-value' + (p.width === 'narrow' ? ' small' : '');
+      val.textContent = formatVal(params[p.id], p);
+
+      slider.addEventListener('input', () => {
+        const v = parseFloat(slider.value);
+        params[p.id] = v;
+        val.textContent = formatVal(v, p);
+        if (moduleId === 'halftone') buildPipelineStrip();
+        scheduleRender();
+      });
+
+      item.appendChild(slider);
+      item.appendChild(val);
+
+    } else if (p.type === 'select') {
+      const sel = document.createElement('select');
+      sel.className = 'ctrl-select';
+      p.options.forEach((opt, i) => {
+        const o = document.createElement('option');
+        o.value = opt; o.textContent = p.labels ? p.labels[i] : opt;
+        if (params[p.id] === opt) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', () => {
+        params[p.id] = sel.value;
+        if (moduleId === 'halftone') {
+          container.innerHTML = ''; buildControls(container, moduleId); buildPipelineStrip();
+        }
+        scheduleRender();
+      });
+      item.appendChild(sel);
+
+    } else if (p.type === 'toggle') {
+      const tg = document.createElement('div');
+      tg.className = 'ctrl-toggle';
+      p.options.forEach(opt => {
+        const btn = document.createElement('div');
+        btn.className = 'ctrl-toggle-btn' + (params[p.id] === opt ? ' active' : '');
+        btn.textContent = opt.toUpperCase();
+        btn.addEventListener('click', () => {
+          params[p.id] = opt;
+          tg.querySelectorAll('.ctrl-toggle-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          scheduleRender();
+        });
+        tg.appendChild(btn);
+      });
+      item.appendChild(tg);
+
+    } else if (p.type === 'color') {
+      const swatch = document.createElement('div');
+      swatch.className = 'ctrl-color';
+      swatch.style.background = params[p.id];
+
+      const input = document.createElement('input');
+      input.type = 'color';
+      input.value = params[p.id];
+      input.addEventListener('input', () => {
+        params[p.id] = input.value;
+        swatch.style.background = input.value;
+        if (moduleId === 'halftone') buildPipelineStrip();
+        scheduleRender();
+      });
+      swatch.appendChild(input);
+      item.appendChild(swatch);
+
+    } else if (p.type === 'xypad') {
+      item.className = 'ctrl-custom-wrap';
+      item.innerHTML = '';
+
+      const padLabel = document.createElement('div');
+      padLabel.className = 'ctrl-custom-label';
+      padLabel.style.color = p.color;
+      padLabel.textContent = p.label;
+      item.appendChild(padLabel);
+
+      const pad = document.createElement('canvas');
+      pad.className = 'ctrl-xypad';
+      pad.width = 90; pad.height = 90;
+      item.appendChild(pad);
+
+      const readout = document.createElement('div');
+      readout.className = 'ctrl-xypad-readout';
+      item.appendChild(readout);
+
+      const range = p.max - p.min;
+
+      function drawPad() {
+        const cx = pad.getContext('2d');
+        cx.clearRect(0, 0, 90, 90);
+        cx.strokeStyle = 'rgba(255,255,255,0.05)';
+        cx.lineWidth = 1;
+        for (let g = 0; g <= 90; g += 22.5) {
+          cx.beginPath(); cx.moveTo(g, 0); cx.lineTo(g, 90); cx.stroke();
+          cx.beginPath(); cx.moveTo(0, g); cx.lineTo(90, g); cx.stroke();
+        }
+        cx.strokeStyle = 'rgba(255,255,255,0.12)';
+        cx.beginPath(); cx.moveTo(45, 0); cx.lineTo(45, 90); cx.stroke();
+        cx.beginPath(); cx.moveTo(0, 45); cx.lineTo(90, 45); cx.stroke();
+
+        const xVal = params[p.xId] || 0;
+        const yVal = params[p.yId] || 0;
+        const px = ((xVal - p.min) / range) * 90;
+        const py = ((yVal - p.min) / range) * 90;
+
+        cx.strokeStyle = p.color + '44';
+        cx.lineWidth = 1;
+        cx.beginPath(); cx.moveTo(px, 0); cx.lineTo(px, 90); cx.stroke();
+        cx.beginPath(); cx.moveTo(0, py); cx.lineTo(90, py); cx.stroke();
+
+        cx.beginPath(); cx.arc(px, py, 4, 0, Math.PI * 2);
+        cx.fillStyle = p.color; cx.fill();
+        cx.strokeStyle = 'rgba(0,0,0,0.5)'; cx.lineWidth = 1; cx.stroke();
+
+        readout.textContent = xVal.toFixed(1) + ', ' + yVal.toFixed(1) + ' px';
+      }
+
+      function updateFromMouse(e) {
+        const rect = pad.getBoundingClientRect();
+        const mx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const my = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        let xVal = p.min + mx * range; let yVal = p.min + my * range;
+        xVal = Math.round(xVal / p.step) * p.step; yVal = Math.round(yVal / p.step) * p.step;
+        params[p.xId] = xVal; params[p.yId] = yVal;
+        drawPad(); scheduleRender();
+      }
+
+      let dragging = false;
+      pad.addEventListener('mousedown', (e) => { dragging = true; updateFromMouse(e); });
+      window.addEventListener('mousemove', (e) => { if (dragging) updateFromMouse(e); });
+      window.addEventListener('mouseup', () => { dragging = false; });
+      pad.addEventListener('dblclick', () => { params[p.xId] = 0; params[p.yId] = 0; drawPad(); scheduleRender(); });
+
+      drawPad();
+    } else if (p.type === 'pressure-roller') {
+      item.className = 'ctrl-custom-wrap';
+      item.innerHTML = '';
+      const lbl = document.createElement('div');
+      lbl.className = 'ctrl-custom-label';
+      lbl.textContent = p.label;
+      if (p.title) { lbl.title = p.title; lbl.style.cursor = 'help'; lbl.style.borderBottom = '1px dotted var(--border2)'; }
+      item.appendChild(lbl);
+
+      const chip = document.createElement('div');
+      chip.className = 'press-chip';
+      chip.innerHTML = `
+        <div class="press-chip-row">
+          <div class="press-svg-wrap" style="width:146px">
+            <svg viewBox="6.9 11.6 146.2 142.5" width="146" height="142" xmlns="http://www.w3.org/2000/svg">
+              <style>
+                .p-body{fill:#161310;stroke:#b8b0a0;stroke-width:1.8;stroke-linejoin:round}
+                .p-face{fill:#161310;stroke:#b8b0a0;stroke-width:1.8;stroke-miterlimit:4.8}
+                .p-hub{fill:none;stroke:#b8b0a0;stroke-width:1.8;stroke-miterlimit:4.8}
+                .p-hub2{fill:none;stroke:#b8b0a0;stroke-width:1;stroke-miterlimit:4.8}
+                .p-paper{fill:#e8e0d0}
+              </style>
+              <path class="p-body" d="M57.2,90.8l41.4-34.7c7.1-6,17.7-5,23.7,2.1s5,17.7-2.1,23.7l-41.4,34.7-21.6-25.7Z"/>
+              <circle class="p-face" cx="68" cy="103.7" r="16.8"/>
+              <g class="motion-f1"><circle class="p-hub"  cx="68" cy="103.7" r="4.8"/></g>
+              <g class="motion-f2"><circle class="p-hub2" cx="68" cy="103.7" r="9"/></g>
+              <rect class="p-paper" x="6.9" y="73.1" width="146.2" height="24.6"/>
+              <g class="pr-top-roller">
+                <path class="p-body" d="M57.2,74l41.4-34.7c7.1-6,17.7-5,23.7,2.1s5,17.7-2.1,23.7l-41.4,34.7-21.6-25.7Z"/>
+                <circle class="p-face" cx="68" cy="86.9" r="16.8"/>
+                <g class="motion-f1"><circle class="p-hub"  cx="68" cy="86.9" r="4.8"/></g>
+                <g class="motion-f2"><circle class="p-hub2" cx="68" cy="86.9" r="9"/></g>
+              </g>
+            </svg>
+          </div>
+          <div class="press-vslider-wrap">
+            <input type="range" class="vert-slider" min="${p.min}" max="${p.max}" step="${p.step}" value="${params[p.id]}">
+          </div>
+        </div>
+      `;
+      item.appendChild(chip);
+
+      const slider = chip.querySelector('.vert-slider');
+      const topRoller = chip.querySelector('.pr-top-roller');
+      const updatePressure = (val) => {
+        const lift = (1.0 - val) * 18;
+        topRoller.setAttribute('transform', `translate(0,${-lift})`);
+      };
+      updatePressure(params[p.id]);
+      slider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        params[p.id] = val;
+        updatePressure(val);
+        scheduleRender();
+      });
+
+    } else if (p.type === 'feed-chip') {
+      item.className = 'ctrl-custom-wrap';
+      item.innerHTML = '';
+      const lbl = document.createElement('div');
+      lbl.className = 'ctrl-custom-label';
+      lbl.textContent = p.label;
+      if (p.title) { lbl.title = p.title; lbl.style.cursor = 'help'; lbl.style.borderBottom = '1px dotted var(--border2)'; }
+      item.appendChild(lbl);
+
+      const chip = document.createElement('div');
+      chip.className = 'press-chip';
+      chip.innerHTML = `
+        <div class="press-svg-wrap" style="width:142px;position:relative">
+          <div class="press-fstate ${params[p.id] === 'horizontal' ? 'active' : ''}" data-feed="horizontal">
+            <svg viewBox="609.6 11.6 142.5 142.5" width="142" height="142" xmlns="http://www.w3.org/2000/svg">
+              <style>
+                .fd-paper{fill:#ffebc6}.fd-roll{fill:#928875}.fd-hub{fill:#ffebc6}.fd-arrow{fill:#231f20}
+                .fd-arc{fill:none;stroke:#fff;stroke-linecap:round;stroke-miterlimit:1.7;stroke-width:1.3}
+              </style>
+              <path class="fd-paper" d="M691.4,129.6l24-24c7.4-7.4,7.4-19.5,0-27-7.4-7.4-19.5-7.4-27,0l-24,24"/>
+              <circle class="fd-roll" cx="677.9" cy="116.2" r="19.1"/>
+              <circle class="fd-hub"  cx="677.9" cy="116.2" r="5.4"/>
+              <g class="motion-f1">
+                <path class="fd-arc" d="M666.2,116.2c0-6.5,5.2-11.7,11.7-11.7"/>
+                <path class="fd-arc" d="M689.6,116.2c0,6.5-5.2,11.7-11.7,11.7"/>
+              </g>
+              <g class="motion-f2">
+                <path class="fd-arc" d="M669,116.2c0-4.9,3.9-8.9,8.9-8.9"/>
+                <path class="fd-arc" d="M686.8,116.2c0,4.9-3.9,8.9-8.9,8.9"/>
+              </g>
+              <polygon class="fd-paper" points="679.9 97.1 608.3 97.1 608.3 73.1 703.9 73.1 679.9 97.1"/>
+              <g class="press-fa">
+                <polygon class="fd-arrow" points="655.8 76.9 648.4 88 643.8 88 638.3 93.5 635.7 93.5 641.2 88 635.7 88 655.8 76.9"/>
+                <polygon class="fd-arrow" points="672.7 76.9 665.2 88 660.7 88 655.1 93.5 652.5 93.5 658.1 88 652.5 88 672.7 76.9"/>
+                <polygon class="fd-arrow" points="689.5 76.9 682 88 677.5 88 671.9 93.5 669.3 93.5 674.9 88 669.3 88 689.5 76.9"/>
+              </g>
+              <g class="press-fb">
+                <polygon class="fd-arrow" points="664.2 76.9 656.8 88 652.2 88 646.7 93.5 644.1 93.5 649.6 88 644.1 88 664.2 76.9"/>
+                <polygon class="fd-arrow" points="681.1 76.9 673.6 88 669.1 88 663.5 93.5 660.9 93.5 666.5 88 660.9 88 681.1 76.9"/>
+              </g>
+            </svg>
+          </div>
+          <div class="press-fstate ${params[p.id] === 'vertical' ? 'active' : ''}" data-feed="vertical">
+            <svg viewBox="609.6 11.6 142.5 142.5" width="142" height="142" xmlns="http://www.w3.org/2000/svg">
+              <path class="fd-paper" d="M691.4,129.6l24-24c7.4-7.4,7.4-19.5,0-27-7.4-7.4-19.5-7.4-27,0l-24,24"/>
+              <circle class="fd-roll" cx="677.9" cy="116.2" r="19.1"/>
+              <circle class="fd-hub"  cx="677.9" cy="116.2" r="5.4"/>
+              <g class="motion-f1">
+                <path class="fd-arc" d="M666.2,116.2c0-6.5,5.2-11.7,11.7-11.7"/>
+                <path class="fd-arc" d="M689.6,116.2c0,6.5-5.2,11.7-11.7,11.7"/>
+              </g>
+              <g class="motion-f2">
+                <path class="fd-arc" d="M669,116.2c0-4.9,3.9-8.9,8.9-8.9"/>
+                <path class="fd-arc" d="M686.8,116.2c0,4.9-3.9,8.9-8.9,8.9"/>
+              </g>
+              <polygon class="fd-paper" points="679.9 97.1 608.3 97.1 608.3 73.1 703.9 73.1 679.9 97.1"/>
+              <g class="press-fa" transform="rotate(90,662,85.2)">
+                <polygon class="fd-arrow" points="655.8 76.9 648.4 88 643.8 88 638.3 93.5 635.7 93.5 641.2 88 635.7 88 655.8 76.9"/>
+                <polygon class="fd-arrow" points="672.7 76.9 665.2 88 660.7 88 655.1 93.5 652.5 93.5 658.1 88 652.5 88 672.7 76.9"/>
+                <polygon class="fd-arrow" points="689.5 76.9 682 88 677.5 88 671.9 93.5 669.3 93.5 674.9 88 669.3 88 689.5 76.9"/>
+              </g>
+              <g class="press-fb" transform="rotate(90,662,85.2)">
+                <polygon class="fd-arrow" points="664.2 76.9 656.8 88 652.2 88 646.7 93.5 644.1 93.5 649.6 88 644.1 88 664.2 76.9"/>
+                <polygon class="fd-arrow" points="681.1 76.9 673.6 88 669.1 88 663.5 93.5 660.9 93.5 666.5 88 660.9 88 681.1 76.9"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+        <div class="press-toggle-wrap" style="width:142px">
+          <button class="press-toggle-btn ${params[p.id] === 'vertical' ? 'active' : ''}" data-val="vertical">Vert</button>
+          <button class="press-toggle-btn ${params[p.id] === 'horizontal' ? 'active' : ''}" data-val="horizontal">Horiz</button>
+        </div>
+      `;
+      item.appendChild(chip);
+
+      chip.querySelectorAll('.press-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = btn.dataset.val;
+          params[p.id] = val;
+          chip.querySelectorAll('.press-toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.val === val));
+          chip.querySelectorAll('.press-fstate').forEach(s => s.classList.toggle('active', s.dataset.feed === val));
+          scheduleRender();
+        });
+      });
+
+    } else if (p.type === 'laydown-chip') {
+      item.className = 'ctrl-custom-wrap';
+      item.innerHTML = '';
+      const lbl = document.createElement('div');
+      lbl.className = 'ctrl-custom-label';
+      lbl.textContent = p.label;
+      if (p.title) { lbl.title = p.title; lbl.style.cursor = 'help'; lbl.style.borderBottom = '1px dotted var(--border2)'; }
+      item.appendChild(lbl);
+
+      const chip = document.createElement('div');
+      chip.className = 'press-chip';
+
+      const LD_SEQS = [
+        { val:'k-c-m-y', label:'K–C–M–Y', order:['k','c','m','y'] },
+        { val:'y-m-c-k', label:'Y–M–C–K', order:['y','m','c','k'] },
+        { val:'c-m-y-k', label:'C–M–Y–K', order:['c','m','y','k'] },
+        { val:'m-c-y-k', label:'M–C–Y–K', order:['m','c','y','k'] },
+      ];
+      const LD_INK = {
+        k:{ cx:214, body:'M207.6,65.4l23-19.3c4.2-3.6,10.5-3,14.1,1.2s3,10.5-1.2,14.1l-23,19.3-12.9-15.3Z', fill:'#3a3530', stroke:'#888',    hub:'#ccc' },
+        c:{ cx:250, body:'M243.6,65.4l23-19.3c4.2-3.6,10.5-3,14.1,1.2s3,10.5-1.2,14.1l-23,19.3-12.9-15.3Z', fill:'#00a0d8', stroke:'#006a96', hub:'#80d0ee' },
+        m:{ cx:286, body:'M279.6,65.4l23-19.3c4.2-3.6,10.5-3,14.1,1.2s3,10.5-1.2,14.1l-23,19.3-12.9-15.3Z', fill:'#d8006a', stroke:'#96004a', hub:'#f080b8' },
+        y:{ cx:322, body:'M315.6,65.4l23-19.3c4.2-3.6,10.5-3,14.1,1.2s3,10.5-1.2,14.1l-23,19.3-12.9-15.3Z', fill:'#d8c800', stroke:'#968c00', hub:'#ece880' },
+      };
+      const LD_SLOTS = [214,250,286,322];
+      const LD_CY = 73.1, LD_R = 10;
+      const SVGNS = 'http://www.w3.org/2000/svg';
+      const ldE = (tag,a) => { const e=document.createElementNS(SVGNS,tag); for(const[k,v]of Object.entries(a))e.setAttribute(k,v); return e; };
+      const curIdx = Math.max(0, LD_SEQS.findIndex(s => s.val === params[p.id]));
+
+      chip.innerHTML = `
+        <div class="press-svg-wrap" style="width:160px">
+          <svg viewBox="200 11.6 160 142.5" width="160" height="142" xmlns="http://www.w3.org/2000/svg">
+            <rect x="200" y="73.1" width="160" height="24" fill="#e8e0d0"/>
+            <g class="press-z1">
+              <line x1="345" y1="80" x2="300" y2="80" stroke="#b0a890" stroke-width="1.2"/>
+              <line x1="338" y1="85" x2="285" y2="85" stroke="#b0a890" stroke-width="1.2"/>
+              <line x1="350" y1="90" x2="310" y2="90" stroke="#b0a890" stroke-width="1.2"/>
+            </g>
+            <g class="press-z2">
+              <line x1="352" y1="80" x2="308" y2="80" stroke="#b0a890" stroke-width="1.2"/>
+              <line x1="344" y1="85" x2="293" y2="85" stroke="#b0a890" stroke-width="1.2"/>
+              <line x1="356" y1="90" x2="318" y2="90" stroke="#b0a890" stroke-width="1.2"/>
+            </g>
+            <g class="ld-rollers"></g>
+          </svg>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:160px">
+          <input type="range" class="press-hslider" style="width:160px" min="0" max="3" step="1" value="${curIdx}">
+          <div class="press-seq-label"></div>
+        </div>
+      `;
+      item.appendChild(chip);
+
+      const ldRollers = chip.querySelector('.ld-rollers');
+      const ldSeqLabel = chip.querySelector('.press-seq-label');
+      const ldSlider = chip.querySelector('.press-hslider');
+
+      function buildLdRoller(slotIdx, inkKey) {
+        const d = LD_INK[inkKey];
+        const dx = LD_SLOTS[slotIdx] - d.cx;
+        const g = ldE('g', { transform:`translate(${dx},0)` });
+        g.appendChild(ldE('path', { d:d.body, fill:d.fill, stroke:d.stroke, 'stroke-width':'1.5', 'stroke-linejoin':'round', 'stroke-miterlimit':'4' }));
+        g.appendChild(ldE('circle', { cx:d.cx, cy:LD_CY, r:LD_R, fill:d.fill, stroke:d.stroke, 'stroke-width':'1.5', 'stroke-miterlimit':'4' }));
+        const f1=ldE('g',{class:'motion-f1'}); f1.appendChild(ldE('circle',{cx:d.cx,cy:LD_CY,r:'3.5',fill:'none',stroke:d.hub,'stroke-width':'1.3','stroke-miterlimit':'4'}));
+        const f2=ldE('g',{class:'motion-f2'}); f2.appendChild(ldE('circle',{cx:d.cx,cy:LD_CY,r:'6',  fill:'none',stroke:d.hub,'stroke-width':'1',  'stroke-miterlimit':'4'}));
+        g.appendChild(f1); g.appendChild(f2);
+        return g;
+      }
+      function renderLdSeq(idx) {
+        const seq = LD_SEQS[idx];
+        ldRollers.innerHTML = '';
+        for (let i = seq.order.length - 1; i >= 0; i--) ldRollers.appendChild(buildLdRoller(i, seq.order[i]));
+        ldSeqLabel.textContent = seq.label;
+        params[p.id] = seq.val;
+      }
+      renderLdSeq(curIdx);
+      ldSlider.addEventListener('input', (e) => { renderLdSeq(parseInt(e.target.value)); scheduleRender(); });
+
+    } else if (p.type === 'slur-chip') {
+      item.className = 'ctrl-custom-wrap';
+      item.innerHTML = '';
+      const lbl = document.createElement('div');
+      lbl.className = 'ctrl-custom-label';
+      lbl.textContent = p.label;
+      if (p.title) { lbl.title = p.title; lbl.style.cursor = 'help'; lbl.style.borderBottom = '1px dotted var(--border2)'; }
+      item.appendChild(lbl);
+
+      const chip = document.createElement('div');
+      chip.className = 'press-chip';
+      chip.innerHTML = `
+        <div class="press-svg-wrap" style="width:160px">
+          <svg viewBox="399 11.6 160 142.5" width="160" height="142" xmlns="http://www.w3.org/2000/svg">
+            <path d="M492.3,63.9l29.1-24.4c5.1-4.3,12.6-3.6,16.9,1.5s3.6,12.6-1.5,16.9l-29.1,24.4-15.4-18.4Z" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-linejoin="round" stroke-miterlimit="4"/>
+            <circle cx="500" cy="73.1" r="12" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-miterlimit="4"/>
+            <g class="motion-f1"><circle cx="500" cy="73.1" r="4" fill="none" stroke="#ccc" stroke-width="1.5"/></g>
+            <g class="motion-f2"><circle cx="500" cy="73.1" r="7" fill="none" stroke="#ccc" stroke-width="1"/></g>
+            <rect x="400" y="73.1" width="160" height="24" fill="#e8e0d0"/>
+            <g class="press-z1">
+              <line x1="555" y1="79" x2="515" y2="79" stroke="#b0a890" stroke-width="1.2"/>
+              <line x1="550" y1="85" x2="505" y2="85" stroke="#b0a890" stroke-width="1.2"/>
+              <line x1="558" y1="91" x2="522" y2="91" stroke="#b0a890" stroke-width="1.2"/>
+            </g>
+            <g class="press-z2">
+              <line x1="552" y1="79" x2="510" y2="79" stroke="#b0a890" stroke-width="1.2"/>
+              <line x1="556" y1="85" x2="512" y2="85" stroke="#b0a890" stroke-width="1.2"/>
+              <line x1="548" y1="91" x2="516" y2="91" stroke="#b0a890" stroke-width="1.2"/>
+            </g>
+            <g class="sl-dots-a press-fa"></g>
+            <g class="sl-dots-b press-fb"></g>
+            <circle cx="500" cy="73.1" r="12" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-miterlimit="4"/>
+            <g class="motion-f1"><circle cx="500" cy="73.1" r="4" fill="none" stroke="#ccc" stroke-width="1.5"/></g>
+            <g class="motion-f2"><circle cx="500" cy="73.1" r="7" fill="none" stroke="#ccc" stroke-width="1"/></g>
+          </svg>
+        </div>
+        <input type="range" class="press-hslider" style="width:160px" min="${p.min}" max="${p.max}" step="${p.step}" value="${params[p.id]}">
+      `;
+      item.appendChild(chip);
+
+      const SL_ST = { low:{rx:7,ry:4,tw:0,to:0}, mid:{rx:11,ry:4,tw:7,to:0.45}, high:{rx:19,ry:4,tw:16,to:0.25} };
+      const SL_A = [{x:422,y:85.1},{x:456,y:85.1}];
+      const SL_B = [{x:414,y:85.1},{x:444,y:85.1},{x:472,y:85.1}];
+      const SVGNS2 = 'http://www.w3.org/2000/svg';
+      const slE = (tag,a) => { const e=document.createElementNS(SVGNS2,tag); for(const[k,v]of Object.entries(a))e.setAttribute(k,v); return e; };
+      const getSlSt = (v) => v<=0.16?SL_ST.low:v<=0.33?SL_ST.mid:SL_ST.high;
+      function makeSlDot(cx,cy,st){
+        const g=document.createElementNS(SVGNS2,'g');
+        if(st.tw>0){ const tx=cx+st.rx; g.appendChild(slE('polygon',{points:`${tx},${cy-st.ry*.7} ${tx+st.tw},${cy-st.ry*.2} ${tx+st.tw},${cy+st.ry*.2} ${tx},${cy+st.ry*.7}`,fill:'#1a1612',opacity:st.to})); }
+        g.appendChild(slE('ellipse',{cx,cy,rx:st.rx,ry:st.ry,fill:'#1a1612'}));
+        return g;
+      }
+      function renderSlDots(val){
+        const st=getSlSt(val);
+        const ga=chip.querySelector('.sl-dots-a'); ga.innerHTML='';
+        const gb=chip.querySelector('.sl-dots-b'); gb.innerHTML='';
+        for(const d of SL_A) ga.appendChild(makeSlDot(d.x,d.y,st));
+        for(const d of SL_B) gb.appendChild(makeSlDot(d.x,d.y,st));
+      }
+      const slSlider = chip.querySelector('.press-hslider');
+      renderSlDots(params[p.id]);
+      slSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        params[p.id] = val;
+        renderSlDots(val);
+        scheduleRender();
+      });
+    }
+    container.appendChild(item);
+  });
+}
+
+function formatVal(v, p) {
+  const unit = p.unit || '';
+  if (p.step < 1) return v.toFixed(p.step < 0.05 ? 2 : 1) + unit;
+  return Math.round(v) + unit;
+}
+
+function applyPreset(name) {
+  const preset = PRESETS[name];
+  if (!preset) return;
+  state.activeModules = new Set(preset.active);
+  // Ensure non-removable modules are present
+  state.activeModules.add('halftone');
+  state.activeModules.add('press');
+  
+  for (const [id, def] of Object.entries(MODULE_DEFS)) {
+    state.moduleParams[id] = {};
+    for (const p of def.params) if (p.default !== undefined) state.moduleParams[id][p.id] = p.default;
+    if (def.extraDefaults) Object.assign(state.moduleParams[id], def.extraDefaults);
+  }
+  for (const [modId, modParams] of Object.entries(preset.params)) {
+    Object.assign(state.moduleParams[modId], modParams);
+  }
+  state.activePanel = null;
+  document.getElementById('module-panel').classList.remove('open');
+  buildPipelineStrip();
+  triggerRender();
+}
+
+function loadImage(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    state.sourceImage = img;
+    state.sourceCanvas = imageToCanvas(img);
+    document.getElementById('drop-zone').style.display = 'none';
+    document.getElementById('canvas-container').style.display = 'block';
+    document.getElementById('preview-canvas').style.display = 'block';
+    triggerRender();
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+}
+
+function toggleExportDropdown(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('export-dropdown');
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) updateExportSize();
+}
+
+function updateExportSize() {
+  const label = document.getElementById('export-size-label');
+  if (!state.sourceCanvas) { label.textContent = '—'; return; }
+  const s = state.exportUpscale;
+  label.textContent = (state.sourceCanvas.width * s) + '×' + (state.sourceCanvas.height * s);
+}
+
+function toggleHQ() {
+  state.hqPreview = !state.hqPreview;
+  if (state.hqPreview) state.prev2x = false;
+  document.getElementById('btn-hq').classList.toggle('active', state.hqPreview);
+  document.getElementById('btn-prev2x').classList.toggle('active', state.prev2x);
+  triggerRender();
+}
+
+function togglePrev2x() {
+  state.prev2x = !state.prev2x;
+  if (state.prev2x) state.hqPreview = false;
+  document.getElementById('btn-prev2x').classList.toggle('active', state.prev2x);
+  document.getElementById('btn-hq').classList.toggle('active', state.hqPreview);
+  triggerRender();
+}
+
+function toggleLoupe() {
+  state.loupeActive = !state.loupeActive;
+  const btn = document.getElementById('btn-loupe');
+  const loupe = document.getElementById('loupe');
+  const area = document.getElementById('canvas-area');
+
+  if (state.loupeActive) {
+    btn.classList.add('active');
+    area.classList.add('loupe-mode');
+    if (state.loupeDirty && state.sourceCanvas) renderLoupeCache();
+  } else {
+    btn.classList.remove('active');
+    area.classList.remove('loupe-mode');
+    loupe.classList.remove('visible');
+  }
+}
+
+function updateLoupe(e) {
+  if (!state.loupeActive || !state.loupeFullRes || !state.sourceCanvas) return;
+
+  const preview = document.getElementById('preview-canvas');
+  const container = document.getElementById('canvas-container');
+  const loupe = document.getElementById('loupe');
+  const loupeCanvas = document.getElementById('loupe-canvas');
+  const loupeCtx = loupeCanvas.getContext('2d');
+  
+  loupeCtx.imageSmoothingEnabled = false;
+
+  const previewRect = preview.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+
+  const mx = e.clientX - previewRect.left;
+  const my = e.clientY - previewRect.top;
+
+  if (mx < 0 || mx > previewRect.width || my < 0 || my > previewRect.height) {
+    loupe.classList.remove('visible'); return;
+  }
+
+  const srcW = state.loupeFullRes.width; const srcH = state.loupeFullRes.height;
+  const fx = (mx / previewRect.width) * srcW; const fy = (my / previewRect.height) * srcH;
+
+  const loupeSize = 220;
+  const sampleSize = 110; 
+  
+  const sx = Math.round(fx - sampleSize / 2); const sy = Math.round(fy - sampleSize / 2);
+
+  loupeCanvas.width = loupeSize; loupeCanvas.height = loupeSize;
+  loupeCtx.imageSmoothingEnabled = false;
+  loupeCtx.fillStyle = state.moduleParams.halftone.paperColor;
+  loupeCtx.fillRect(0, 0, loupeSize, loupeSize);
+
+  const csx = Math.max(0, sx); const csy = Math.max(0, sy);
+  const cdx = Math.max(0, -sx); const cdy = Math.max(0, -sy);
+  const csw = Math.min(sampleSize - cdx, srcW - csx); const csh = Math.min(sampleSize - cdy, srcH - csy);
+
+  if (csw > 0 && csh > 0) {
+    loupeCtx.drawImage(state.loupeFullRes, csx, csy, csw, csh, cdx * 2, cdy * 2, csw * 2, csh * 2);
+  }
+
+  let lx = e.clientX - containerRect.left + 20; let ly = e.clientY - containerRect.top - loupeSize - 10;
+  if (lx + loupeSize > containerRect.width) lx = e.clientX - containerRect.left - loupeSize - 20;
+  if (ly < 0) ly = e.clientY - containerRect.top + 20;
+
+  loupe.style.left = lx + 'px'; loupe.style.top = ly + 'px';
+  loupe.classList.add('visible');
+}
+
+function setupSplitDrag() {
+  const area = document.getElementById('canvas-area');
+  area.addEventListener('mousedown', (e) => {
+    if (!state.sourceCanvas) return;
+    if (state.loupeActive) {
+      if (state.loupeDirty) renderLoupeCache();
+      updateLoupe(e); state.draggingLoupe = true; return;
+    }
+    state.draggingSplit = true; updateSplit(e);
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (state.draggingLoupe) { updateLoupe(e); return; }
+    if (!state.draggingSplit) return;
+    updateSplit(e);
+  });
+  window.addEventListener('mouseup', () => {
+    if (state.draggingLoupe) document.getElementById('loupe').classList.remove('visible');
+    state.draggingSplit = false; state.draggingLoupe = false;
+  });
+  area.addEventListener('touchstart', (e) => {
+    if (!state.sourceCanvas) return;
+    if (state.loupeActive) {
+      if (state.loupeDirty) renderLoupeCache();
+      updateLoupe(e.touches[0]); state.draggingLoupe = true; return;
+    }
+    state.draggingSplit = true; updateSplit(e.touches[0]);
+  }, { passive: true });
+  window.addEventListener('touchmove', (e) => {
+    if (state.draggingLoupe) { updateLoupe(e.touches[0]); return; }
+    if (!state.draggingSplit) return;
+    updateSplit(e.touches[0]);
+  }, { passive: true });
+  window.addEventListener('touchend', () => {
+    if (state.draggingLoupe) document.getElementById('loupe').classList.remove('visible');
+    state.draggingSplit = false; state.draggingLoupe = false;
+  });
+}
+
+function updateSplit(e) {
+  const preview = document.getElementById('preview-canvas');
+  const previewRect = preview.getBoundingClientRect();
+  const relX = Math.max(0, Math.min(1, (e.clientX - previewRect.left) / preview.width));
+  state.splitX = relX;
+  drawSplit();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildPipelineStrip(); setupSplitDrag();
+  const fileInput = document.getElementById('file-input');
+  const dropZone = document.getElementById('drop-zone');
+  dropZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadImage(fileInput.files[0]); });
+  const area = document.getElementById('canvas-area');
+  area.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  area.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  area.addEventListener('drop', (e) => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) loadImage(file);
+  });
+  document.getElementById('preset-select').addEventListener('change', (e) => {
+    if (e.target.value) applyPreset(e.target.value);
+    e.target.value = '';
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.add-module-btn')) document.querySelectorAll('.add-dropdown.open').forEach(d => d.classList.remove('open'));
+    if (!e.target.closest('.export-wrap')) document.getElementById('export-dropdown').classList.remove('open');
+  });
+  window.addEventListener('resize', () => { if (state.processedCanvas) drawSplit(); });
+  document.addEventListener('paste', (e) => {
+    const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'));
+    if (item) loadImage(item.getAsFile());
+  });
+});
+</script>
+</body>
+</html>
