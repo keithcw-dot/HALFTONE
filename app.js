@@ -770,12 +770,13 @@ function _drawShape(ctx, cx, cy, r, shape) {
     ctx.lineTo(cx, cy + r * 1.3);
     ctx.lineTo(cx - r * 1.3, cy);
     ctx.closePath();
+    ctx.fill();
   } else if (shape === 'line') {
-    ctx.rect(cx - r * 1.7, cy - r * 0.38, r * 3.4, r * 0.76);
+    // Line is drawn in caller with rotation context — skip here
   } else {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
   }
-  ctx.fill();
 }
 
 function _drawDots(ctx, w, h, angleDeg, inkHex, cellPx, shape) {
@@ -786,12 +787,25 @@ function _drawDots(ctx, w, h, angleDeg, inkHex, cellPx, shape) {
   const cx = w / 2, cy = h / 2;
   const r  = cellPx * 0.36;
   ctx.fillStyle = inkHex;
+
   for (let gy = -diag; gy < diag; gy += cellPx) {
     for (let gx = -diag; gx < diag; gx += cellPx) {
       const x = cx + gx * cosA - gy * sinA;
       const y = cy + gx * sinA + gy * cosA;
       if (x < -cellPx || x > w + cellPx || y < -cellPx || y > h + cellPx) continue;
-      _drawShape(ctx, x, y, r, shape);
+
+      if (shape === 'line') {
+        // Rotate the dash to match the grid angle
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rad);
+        ctx.beginPath();
+        ctx.rect(-r * 1.7, -r * 0.38, r * 3.4, r * 0.76);
+        ctx.fill();
+        ctx.restore();
+      } else {
+        _drawShape(ctx, x, y, r, shape);
+      }
     }
   }
 }
@@ -941,6 +955,8 @@ function buildScreenChip(p, params, item) {
   slider.addEventListener('input', () => {
     params[p.id] = parseInt(slider.value);
     draw();
+    // Cell size affects all other dot-field previews
+    Object.entries(_htDrawers).forEach(([id, fn]) => { if (id !== p.id) fn(); });
     scheduleRender();
   });
 }
