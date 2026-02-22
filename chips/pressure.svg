@@ -1,0 +1,22 @@
+<svg viewBox="6.9 11.6 146.2 142.5" width="146" height="142" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .p-body  { fill: #161310; stroke: #b8b0a0; stroke-width: 1.8; stroke-linejoin: round }
+    .p-face  { fill: #161310; stroke: #b8b0a0; stroke-width: 1.8; stroke-miterlimit: 4.8 }
+    .p-hub   { fill: none;    stroke: #b8b0a0; stroke-width: 1.8; stroke-miterlimit: 4.8 }
+    .p-hub2  { fill: none;    stroke: #b8b0a0; stroke-width: 1;   stroke-miterlimit: 4.8 }
+    .p-paper { fill: #e8e0d0 }
+  </style>
+  <g transform="translate(160,0) scale(-1,1)">
+    <path class="p-body" d="M57.2,90.8l41.4-34.7c7.1-6,17.7-5,23.7,2.1s5,17.7-2.1,23.7l-41.4,34.7-21.6-25.7Z"/>
+    <circle class="p-face" cx="68" cy="103.7" r="16.8"/>
+    <g class="motion-f1"><circle class="p-hub"  cx="68" cy="103.7" r="4.8"/></g>
+    <g class="motion-f2"><circle class="p-hub2" cx="68" cy="103.7" r="9"/></g>
+    <rect class="p-paper" x="6.9" y="73.1" width="146.2" height="24.6"/>
+    <g class="pr-top-roller">
+      <path class="p-body" d="M57.2,74l41.4-34.7c7.1-6,17.7-5,23.7,2.1s5,17.7-2.1,23.7l-41.4,34.7-21.6-25.7Z"/>
+      <circle class="p-face" cx="68" cy="86.9" r="16.8"/>
+      <g class="motion-f1"><circle class="p-hub"  cx="68" cy="86.9" r="4.8"/></g>
+      <g class="motion-f2"><circle class="p-hub2" cx="68" cy="86.9" r="9"/></g>
+    </g>
+  </g>
+</svg>

@@ -505,6 +505,39 @@ function buildXYPadControl(p, params, item) {
   drawPad();
 }
 
+// ─── SVG chip asset cache ─────────────────────────────────────────
+// All external chip SVGs are fetched once at init and stored here.
+// Builders call _svgClone(key) to get a fresh DOM clone synchronously.
+// To add a new chip SVG: add an entry to CHIP_SVGS and create the file.
+const CHIP_SVGS = {
+  'feed-horizontal': './chips/feed-horizontal.svg',
+  'feed-vertical':   './chips/feed-vertical.svg',
+  'pressure':        './chips/pressure.svg',
+  'laydown':         './chips/laydown.svg',
+  'slur':            './chips/slur.svg',
+};
+
+const _svgCache = {};  // key → SVGElement
+
+async function preloadChipSVGs() {
+  await Promise.all(Object.entries(CHIP_SVGS).map(async ([key, url]) => {
+    try {
+      const res  = await fetch(url);
+      const text = await res.text();
+      const doc  = new DOMParser().parseFromString(text, 'image/svg+xml');
+      _svgCache[key] = doc.documentElement;
+    } catch (e) {
+      console.warn(`chip SVG load failed: ${key}`, e);
+    }
+  }));
+}
+
+function _svgClone(key) {
+  const src = _svgCache[key];
+  if (!src) { console.warn('SVG not cached:', key); return document.createElementNS('http://www.w3.org/2000/svg', 'svg'); }
+  return src.cloneNode(true);
+}
+
 // ─── Press chip shared label helper ─────────────────────────────
 function buildChipLabel(p, item) {
   item.className = 'ctrl-custom-wrap';
@@ -520,41 +553,30 @@ function buildPressureChip(p, params, item) {
   buildChipLabel(p, item);
   const chip = document.createElement('div');
   chip.className = 'press-chip';
-  chip.innerHTML = `
-    <div class="press-chip-row">
-      <div class="press-svg-wrap" style="width:146px">
-        <svg viewBox="6.9 11.6 146.2 142.5" width="146" height="142" xmlns="http://www.w3.org/2000/svg">
-          <style>
-            .p-body{fill:#161310;stroke:#b8b0a0;stroke-width:1.8;stroke-linejoin:round}
-            .p-face{fill:#161310;stroke:#b8b0a0;stroke-width:1.8;stroke-miterlimit:4.8}
-            .p-hub{fill:none;stroke:#b8b0a0;stroke-width:1.8;stroke-miterlimit:4.8}
-            .p-hub2{fill:none;stroke:#b8b0a0;stroke-width:1;stroke-miterlimit:4.8}
-            .p-paper{fill:#e8e0d0}
-          </style>
-          <g transform="translate(160,0) scale(-1,1)">
-          <path class="p-body" d="M57.2,90.8l41.4-34.7c7.1-6,17.7-5,23.7,2.1s5,17.7-2.1,23.7l-41.4,34.7-21.6-25.7Z"/>
-          <circle class="p-face" cx="68" cy="103.7" r="16.8"/>
-          <g class="motion-f1"><circle class="p-hub"  cx="68" cy="103.7" r="4.8"/></g>
-          <g class="motion-f2"><circle class="p-hub2" cx="68" cy="103.7" r="9"/></g>
-          <rect class="p-paper" x="6.9" y="73.1" width="146.2" height="24.6"/>
-          <g class="pr-top-roller">
-            <path class="p-body" d="M57.2,74l41.4-34.7c7.1-6,17.7-5,23.7,2.1s5,17.7-2.1,23.7l-41.4,34.7-21.6-25.7Z"/>
-            <circle class="p-face" cx="68" cy="86.9" r="16.8"/>
-            <g class="motion-f1"><circle class="p-hub"  cx="68" cy="86.9" r="4.8"/></g>
-            <g class="motion-f2"><circle class="p-hub2" cx="68" cy="86.9" r="9"/></g>
-          </g>
-          </g>
-        </svg>
-      </div>
-      <div class="press-vslider-wrap">
-        <input type="range" class="vert-slider" min="${p.min}" max="${p.max}" step="${p.step}" value="${params[p.id]}">
-      </div>
-    </div>
-  `;
+
+  const row = document.createElement('div');
+  row.className = 'press-chip-row';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'press-svg-wrap';
+  wrap.style.width = '146px';
+  const svg = _svgClone('pressure');
+  svg.setAttribute('width', '146'); svg.setAttribute('height', '142');
+  wrap.appendChild(svg);
+  row.appendChild(wrap);
+
+  const vwrap = document.createElement('div');
+  vwrap.className = 'press-vslider-wrap';
+  const slider = document.createElement('input');
+  slider.type = 'range'; slider.className = 'vert-slider';
+  slider.min = p.min; slider.max = p.max; slider.step = p.step; slider.value = params[p.id];
+  vwrap.appendChild(slider);
+  row.appendChild(vwrap);
+
+  chip.appendChild(row);
   item.appendChild(chip);
 
-  const slider    = chip.querySelector('.vert-slider');
-  const topRoller = chip.querySelector('.pr-top-roller');
+  const topRoller = svg.querySelector('.pr-top-roller');
   const update = (val) => topRoller.setAttribute('transform', `translate(0,${-(1.0 - val) * 18})`);
   update(params[p.id]);
   slider.addEventListener('input', (e) => { const val = parseFloat(e.target.value); params[p.id] = val; update(val); scheduleRender(); });
@@ -564,57 +586,36 @@ function buildFeedChip(p, params, item) {
   buildChipLabel(p, item);
   const chip = document.createElement('div');
   chip.className = 'press-chip';
-  chip.innerHTML = `
-    <div class="press-svg-wrap" style="width:142px;position:relative">
-      <div class="press-fstate ${params[p.id] === 'horizontal' ? 'active' : ''}" data-feed="horizontal">
-        <svg viewBox="609.6 11.6 142.5 142.5" width="142" height="142" xmlns="http://www.w3.org/2000/svg">
-          <style>.fd-paper{fill:#ffebc6}.fd-roll{fill:#928875}.fd-hub{fill:#ffebc6}.fd-arrow{fill:#231f20}.fd-arc{fill:none;stroke:#fff;stroke-linecap:round;stroke-miterlimit:1.7;stroke-width:1.3}</style>
-          <g transform="translate(1362.2,0) scale(-1,1)">
-          <path class="fd-paper" d="M691.4,129.6l24-24c7.4-7.4,7.4-19.5,0-27-7.4-7.4-19.5-7.4-27,0l-24,24"/>
-          <circle class="fd-roll" cx="677.9" cy="116.2" r="19.1"/>
-          <circle class="fd-hub"  cx="677.9" cy="116.2" r="5.4"/>
-          <g class="motion-f1"><path class="fd-arc" d="M666.2,116.2c0-6.5,5.2-11.7,11.7-11.7"/><path class="fd-arc" d="M689.6,116.2c0,6.5-5.2,11.7-11.7,11.7"/></g>
-          <g class="motion-f2"><path class="fd-arc" d="M669,116.2c0-4.9,3.9-8.9,8.9-8.9"/><path class="fd-arc" d="M686.8,116.2c0,4.9-3.9,8.9-8.9,8.9"/></g>
-          <polygon class="fd-paper" points="679.9 97.1 608.3 97.1 608.3 73.1 703.9 73.1 679.9 97.1"/>
-          <g class="press-fa">
-            <polygon class="fd-arrow" points="655.8 76.9 648.4 88 643.8 88 638.3 93.5 635.7 93.5 641.2 88 635.7 88 655.8 76.9"/>
-            <polygon class="fd-arrow" points="672.7 76.9 665.2 88 660.7 88 655.1 93.5 652.5 93.5 658.1 88 652.5 88 672.7 76.9"/>
-            <polygon class="fd-arrow" points="689.5 76.9 682 88 677.5 88 671.9 93.5 669.3 93.5 674.9 88 669.3 88 689.5 76.9"/>
-          </g>
-          <g class="press-fb">
-            <polygon class="fd-arrow" points="664.2 76.9 656.8 88 652.2 88 646.7 93.5 644.1 93.5 649.6 88 644.1 88 664.2 76.9"/>
-            <polygon class="fd-arrow" points="681.1 76.9 673.6 88 669.1 88 663.5 93.5 660.9 93.5 666.5 88 660.9 88 681.1 76.9"/>
-          </g>
-          </g>
-        </svg>
-      </div>
-      <div class="press-fstate ${params[p.id] === 'vertical' ? 'active' : ''}" data-feed="vertical">
-        <svg viewBox="609.6 11.6 142.5 142.5" width="142" height="142" xmlns="http://www.w3.org/2000/svg">
-          <g transform="translate(1362.2,0) scale(-1,1)">
-          <path class="fd-paper" d="M691.4,129.6l24-24c7.4-7.4,7.4-19.5,0-27-7.4-7.4-19.5-7.4-27,0l-24,24"/>
-          <circle class="fd-roll" cx="677.9" cy="116.2" r="19.1"/>
-          <circle class="fd-hub"  cx="677.9" cy="116.2" r="5.4"/>
-          <g class="motion-f1"><path class="fd-arc" d="M666.2,116.2c0-6.5,5.2-11.7,11.7-11.7"/><path class="fd-arc" d="M689.6,116.2c0,6.5-5.2,11.7-11.7,11.7"/></g>
-          <g class="motion-f2"><path class="fd-arc" d="M669,116.2c0-4.9,3.9-8.9,8.9-8.9"/><path class="fd-arc" d="M686.8,116.2c0,4.9-3.9,8.9-8.9,8.9"/></g>
-          <polygon class="fd-paper" points="679.9 97.1 608.3 97.1 608.3 73.1 703.9 73.1 679.9 97.1"/>
-          <g class="press-fa" transform="rotate(90,662,85.2)">
-            <polygon class="fd-arrow" points="655.8 76.9 648.4 88 643.8 88 638.3 93.5 635.7 93.5 641.2 88 635.7 88 655.8 76.9"/>
-            <polygon class="fd-arrow" points="672.7 76.9 665.2 88 660.7 88 655.1 93.5 652.5 93.5 658.1 88 652.5 88 672.7 76.9"/>
-            <polygon class="fd-arrow" points="689.5 76.9 682 88 677.5 88 671.9 93.5 669.3 93.5 674.9 88 669.3 88 689.5 76.9"/>
-          </g>
-          <g class="press-fb" transform="rotate(90,662,85.2)">
-            <polygon class="fd-arrow" points="664.2 76.9 656.8 88 652.2 88 646.7 93.5 644.1 93.5 649.6 88 644.1 88 664.2 76.9"/>
-            <polygon class="fd-arrow" points="681.1 76.9 673.6 88 669.1 88 663.5 93.5 660.9 93.5 666.5 88 660.9 88 681.1 76.9"/>
-          </g>
-          </g>
-        </svg>
-      </div>
-    </div>
-    <div class="press-toggle-wrap" style="width:142px">
-      <button class="press-toggle-btn ${params[p.id] === 'vertical'   ? 'active' : ''}" data-val="vertical">Vert</button>
-      <button class="press-toggle-btn ${params[p.id] === 'horizontal' ? 'active' : ''}" data-val="horizontal">Horiz</button>
-    </div>
-  `;
+
+  const svgWrap = document.createElement('div');
+  svgWrap.className = 'press-svg-wrap';
+  svgWrap.style.cssText = 'width:142px; position:relative';
+
+  const makeState = (feedVal) => {
+    const div = document.createElement('div');
+    div.className = `press-fstate${params[p.id] === feedVal ? ' active' : ''}`;
+    div.dataset.feed = feedVal;
+    const svg = _svgClone(`feed-${feedVal}`);
+    svg.setAttribute('width', '142'); svg.setAttribute('height', '142');
+    div.appendChild(svg);
+    return div;
+  };
+
+  svgWrap.appendChild(makeState('horizontal'));
+  svgWrap.appendChild(makeState('vertical'));
+  chip.appendChild(svgWrap);
+
+  const toggleWrap = document.createElement('div');
+  toggleWrap.className = 'press-toggle-wrap';
+  toggleWrap.style.width = '142px';
+  ['vertical', 'horizontal'].forEach(val => {
+    const btn = document.createElement('button');
+    btn.className = `press-toggle-btn${params[p.id] === val ? ' active' : ''}`;
+    btn.dataset.val = val;
+    btn.textContent = val === 'vertical' ? 'Vert' : 'Horiz';
+    toggleWrap.appendChild(btn);
+  });
+  chip.appendChild(toggleWrap);
   item.appendChild(chip);
 
   chip.querySelectorAll('.press-toggle-btn').forEach(btn => {
@@ -650,30 +651,17 @@ function buildLaydownChip(p, params, item) {
   const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
   const curIdx = Math.max(0, LD_SEQS.findIndex(s => s.val === params[p.id]));
 
+  const svg = _svgClone('laydown');
+  svg.setAttribute('width', '160'); svg.setAttribute('height', '142');
+
   chip.innerHTML = `
-    <div class="press-svg-wrap" style="width:160px">
-      <svg viewBox="200 11.6 160 142.5" width="160" height="142" xmlns="http://www.w3.org/2000/svg">
-        <g transform="translate(560,0) scale(-1,1)">
-        <rect x="200" y="73.1" width="160" height="24" fill="#e8e0d0"/>
-        <g class="press-z1">
-          <line x1="345" y1="80" x2="300" y2="80" stroke="#b0a890" stroke-width="1.2"/>
-          <line x1="338" y1="85" x2="285" y2="85" stroke="#b0a890" stroke-width="1.2"/>
-          <line x1="350" y1="90" x2="310" y2="90" stroke="#b0a890" stroke-width="1.2"/>
-        </g>
-        <g class="press-z2">
-          <line x1="352" y1="80" x2="308" y2="80" stroke="#b0a890" stroke-width="1.2"/>
-          <line x1="344" y1="85" x2="293" y2="85" stroke="#b0a890" stroke-width="1.2"/>
-          <line x1="356" y1="90" x2="318" y2="90" stroke="#b0a890" stroke-width="1.2"/>
-        </g>
-        <g class="ld-rollers"></g>
-        </g>
-      </svg>
-    </div>
+    <div class="press-svg-wrap" style="width:160px"></div>
     <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:160px">
       <input type="range" class="press-hslider" style="width:160px" min="0" max="3" step="1" value="${curIdx}">
       <div class="press-seq-label"></div>
     </div>
   `;
+  chip.querySelector('.press-svg-wrap').appendChild(svg);
   item.appendChild(chip);
 
   const ldRollers  = chip.querySelector('.ld-rollers');
@@ -708,35 +696,14 @@ function buildSlurChip(p, params, item) {
   buildChipLabel(p, item);
   const chip = document.createElement('div');
   chip.className = 'press-chip';
+  const slurSvg = _svgClone('slur');
+  slurSvg.setAttribute('width', '160'); slurSvg.setAttribute('height', '142');
+
   chip.innerHTML = `
-    <div class="press-svg-wrap" style="width:160px">
-      <svg viewBox="399 11.6 160 142.5" width="160" height="142" xmlns="http://www.w3.org/2000/svg">
-        <g transform="translate(958,0) scale(-1,1)">
-        <path d="M492.3,63.9l29.1-24.4c5.1-4.3,12.6-3.6,16.9,1.5s3.6,12.6-1.5,16.9l-29.1,24.4-15.4-18.4Z" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-linejoin="round" stroke-miterlimit="4"/>
-        <circle cx="500" cy="73.1" r="12" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-miterlimit="4"/>
-        <g class="motion-f1"><circle cx="500" cy="73.1" r="4" fill="none" stroke="#ccc" stroke-width="1.5"/></g>
-        <g class="motion-f2"><circle cx="500" cy="73.1" r="7" fill="none" stroke="#ccc" stroke-width="1"/></g>
-        <rect x="400" y="73.1" width="160" height="24" fill="#e8e0d0"/>
-        <g class="press-z1">
-          <line x1="555" y1="79" x2="515" y2="79" stroke="#b0a890" stroke-width="1.2"/>
-          <line x1="550" y1="85" x2="505" y2="85" stroke="#b0a890" stroke-width="1.2"/>
-          <line x1="558" y1="91" x2="522" y2="91" stroke="#b0a890" stroke-width="1.2"/>
-        </g>
-        <g class="press-z2">
-          <line x1="552" y1="79" x2="510" y2="79" stroke="#b0a890" stroke-width="1.2"/>
-          <line x1="556" y1="85" x2="512" y2="85" stroke="#b0a890" stroke-width="1.2"/>
-          <line x1="548" y1="91" x2="516" y2="91" stroke="#b0a890" stroke-width="1.2"/>
-        </g>
-        <g class="sl-dots-a press-fa"></g>
-        <g class="sl-dots-b press-fb"></g>
-        <circle cx="500" cy="73.1" r="12" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-miterlimit="4"/>
-        <g class="motion-f1"><circle cx="500" cy="73.1" r="4" fill="none" stroke="#ccc" stroke-width="1.5"/></g>
-        <g class="motion-f2"><circle cx="500" cy="73.1" r="7" fill="none" stroke="#ccc" stroke-width="1"/></g>
-        </g>
-      </svg>
-    </div>
+    <div class="press-svg-wrap" style="width:160px"></div>
     <input type="range" class="press-hslider" style="width:160px" min="${p.min}" max="${p.max}" step="${p.step}" value="${params[p.id]}">
   `;
+  chip.querySelector('.press-svg-wrap').appendChild(slurSvg);
   item.appendChild(chip);
 
   const SL_STATES = { low: {rx:7, ry:4, tw:0, to:0}, mid: {rx:11, ry:4, tw:7, to:0.45}, high: {rx:19, ry:4, tw:16, to:0.25} };
@@ -2102,7 +2069,8 @@ function applyPreset(name) {
 
 
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await preloadChipSVGs();
   buildPipelineStrip();
   setupSplitDrag();
 

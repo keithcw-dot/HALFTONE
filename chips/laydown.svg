@@ -1,0 +1,17 @@
+<svg viewBox="200 11.6 160 142.5" width="160" height="142" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(560,0) scale(-1,1)">
+    <rect x="200" y="73.1" width="160" height="24" fill="#e8e0d0"/>
+    <g class="press-z1">
+      <line x1="345" y1="80"  x2="300" y2="80"  stroke="#b0a890" stroke-width="1.2"/>
+      <line x1="338" y1="85"  x2="285" y2="85"  stroke="#b0a890" stroke-width="1.2"/>
+      <line x1="350" y1="90"  x2="310" y2="90"  stroke="#b0a890" stroke-width="1.2"/>
+    </g>
+    <g class="press-z2">
+      <line x1="352" y1="80"  x2="308" y2="80"  stroke="#b0a890" stroke-width="1.2"/>
+      <line x1="344" y1="85"  x2="293" y2="85"  stroke="#b0a890" stroke-width="1.2"/>
+      <line x1="356" y1="90"  x2="318" y2="90"  stroke="#b0a890" stroke-width="1.2"/>
+    </g>
+    <!-- ink rollers injected here by buildLaydownChip() -->
+    <g class="ld-rollers"></g>
+  </g>
+</svg>

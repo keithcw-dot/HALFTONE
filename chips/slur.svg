@@ -1,0 +1,27 @@
+<svg viewBox="399 11.6 160 142.5" width="160" height="142" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(958,0) scale(-1,1)">
+    <path d="M492.3,63.9l29.1-24.4c5.1-4.3,12.6-3.6,16.9,1.5s3.6,12.6-1.5,16.9l-29.1,24.4-15.4-18.4Z"
+          fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-linejoin="round" stroke-miterlimit="4"/>
+    <circle cx="500" cy="73.1" r="12" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-miterlimit="4"/>
+    <g class="motion-f1"><circle cx="500" cy="73.1" r="4"  fill="none" stroke="#ccc" stroke-width="1.5"/></g>
+    <g class="motion-f2"><circle cx="500" cy="73.1" r="7"  fill="none" stroke="#ccc" stroke-width="1"/></g>
+    <rect x="400" y="73.1" width="160" height="24" fill="#e8e0d0"/>
+    <g class="press-z1">
+      <line x1="555" y1="79"  x2="515" y2="79"  stroke="#b0a890" stroke-width="1.2"/>
+      <line x1="550" y1="85"  x2="505" y2="85"  stroke="#b0a890" stroke-width="1.2"/>
+      <line x1="558" y1="91"  x2="522" y2="91"  stroke="#b0a890" stroke-width="1.2"/>
+    </g>
+    <g class="press-z2">
+      <line x1="552" y1="79"  x2="510" y2="79"  stroke="#b0a890" stroke-width="1.2"/>
+      <line x1="556" y1="85"  x2="512" y2="85"  stroke="#b0a890" stroke-width="1.2"/>
+      <line x1="548" y1="91"  x2="516" y2="91"  stroke="#b0a890" stroke-width="1.2"/>
+    </g>
+    <!-- slurred dots injected by buildSlurChip() -->
+    <g class="sl-dots-a press-fa"></g>
+    <g class="sl-dots-b press-fb"></g>
+    <!-- roller redrawn on top so it covers paper strip -->
+    <circle cx="500" cy="73.1" r="12" fill="#3a3530" stroke="#888" stroke-width="1.5" stroke-miterlimit="4"/>
+    <g class="motion-f1"><circle cx="500" cy="73.1" r="4"  fill="none" stroke="#ccc" stroke-width="1.5"/></g>
+    <g class="motion-f2"><circle cx="500" cy="73.1" r="7"  fill="none" stroke="#ccc" stroke-width="1"/></g>
+  </g>
+</svg>
